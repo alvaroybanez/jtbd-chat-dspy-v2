@@ -27,7 +27,7 @@
   - Implement text chunking with overlap for document processing
   - _Requirements: 1.5, 7.1, 7.2, 7.3_
 
-- [ ] 3.3 Build chat intent detection and retrieval services
+- [x] 3.3 Build chat intent detection and retrieval services
   - Implement keyword-based intent detection logic
   - Create context retrieval service for insights, metrics, and JTBDs
   - Build token budget management and truncation utilities
