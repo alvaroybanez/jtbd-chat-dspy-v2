@@ -19,11 +19,14 @@ The JTBD Assistant Platform is a dual-service architecture combining TypeScript 
 graph TB
     subgraph "Client Layer"
         UI[Next.js Chat Interface]
+        SESSION[Session Manager]
     end
     
     subgraph "TypeScript Service Layer"
         API[Next.js API Routes]
         CHAT[Chat Orchestrator]
+        PERSIST[Chat Persistence Manager] 
+        CONTEXT[Context Manager]
         UPLOAD[Document Processor]
         FALLBACK[Fallback Generator]
     end
@@ -36,11 +39,15 @@ graph TB
     
     subgraph "Data Layer"
         SUPABASE[(Supabase PostgreSQL + pgvector)]
+        CHAT_STORE[Chat & Message Storage]
         EMBED[OpenAI Embeddings]
     end
     
-    UI --> API
+    UI --> SESSION
+    SESSION --> API
     API --> CHAT
+    CHAT --> PERSIST
+    CHAT --> CONTEXT
     API --> UPLOAD
     CHAT --> DSPY
     CHAT --> FALLBACK
@@ -48,7 +55,8 @@ graph TB
     UPLOAD --> SUPABASE
     DSPY --> HMW
     DSPY --> SOL
-    CHAT --> SUPABASE
+    PERSIST --> CHAT_STORE
+    CONTEXT --> SUPABASE
     FALLBACK --> SUPABASE
 ```
 
@@ -113,6 +121,26 @@ function detectIntent(message: string): ChatIntent {
 5. Extract insights using AI analysis
 6. Store document, chunks, and insights with relationships
 
+#### Chat Persistence Manager
+**Purpose**: Manages chat session lifecycle, message persistence, and context tracking
+
+**Key Methods**:
+- `createChatSession(userId, title?, initialContext?)`: Creates new chat with optional initial context
+- `loadChatSession(chatId)`: Retrieves chat with messages and context
+- `saveMessage(chatId, message, metadata)`: Persists message with processing metadata
+- `updateChatContext(chatId, contextUpdates)`: Updates selected documents/insights/JTBDs/metrics
+- `archiveChat(chatId)`: Soft-delete chat session
+- `getChatHistory(userId, limit, offset)`: Retrieves user's chat sessions
+
+#### Context Manager
+**Purpose**: Manages the context window and state for ongoing conversations
+
+**Key Methods**:
+- `buildChatContext(chatId)`: Constructs context from selected items
+- `updateSelectedItems(chatId, type, ids)`: Updates selected context items
+- `getEffectiveContext(messages, maxTokens)`: Manages token budget with truncation
+- `trackContextUsage(messageId, contextItems)`: Records what context was used
+
 #### Fallback Generator
 **Purpose**: Provides local generation when DSPy services are unavailable
 
@@ -159,10 +187,42 @@ class CreateSolutions(dspy.Signature):
 #### TypeScript Public APIs
 
 ```typescript
-// Chat endpoint with streaming
+// Enhanced chat endpoint with session management
 POST /api/v1/chat
-Request: { messages: Message[], session_id: string }
-Response: Server-Sent Events stream
+Request: { 
+  chat_id?: string,  // Optional: continue existing chat
+  messages?: Message[], // Optional: override stored messages
+  context_override?: {  // Optional: override stored context
+    document_ids?: string[],
+    insight_ids?: string[],
+    jtbd_ids?: string[],
+    metric_ids?: string[]
+  }
+}
+Response: Server-Sent Events stream with:
+  - message chunks
+  - intent detection
+  - context updates
+  - processing metadata
+
+// Chat management endpoints
+GET /api/v1/chats
+Response: { chats: Chat[], total: number }
+
+GET /api/v1/chats/:id
+Response: { chat: Chat, messages: Message[] }
+
+PUT /api/v1/chats/:id/context
+Request: { 
+  document_ids?: string[],
+  insight_ids?: string[],
+  jtbd_ids?: string[],
+  metric_ids?: string[]
+}
+Response: { updated: boolean }
+
+DELETE /api/v1/chats/:id
+Response: { archived: boolean }
 
 // Document upload
 POST /api/v1/upload
@@ -308,6 +368,45 @@ CREATE TABLE solutions (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Chat sessions
+CREATE TABLE chats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    title TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_message_at TIMESTAMPTZ,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived', 'deleted')),
+    message_count INTEGER NOT NULL DEFAULT 0,
+    selected_document_ids UUID[] NOT NULL DEFAULT '{}',
+    selected_insight_ids UUID[] NOT NULL DEFAULT '{}', 
+    selected_jtbd_ids UUID[] NOT NULL DEFAULT '{}',
+    selected_metric_ids UUID[] NOT NULL DEFAULT '{}',
+    total_tokens_used INTEGER NOT NULL DEFAULT 0,
+    metadata JSONB NOT NULL DEFAULT '{}'
+);
+
+-- Chat messages
+CREATE TABLE chat_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    intent TEXT,
+    processing_time_ms INTEGER,
+    tokens_used INTEGER NOT NULL DEFAULT 0,
+    context_document_chunks UUID[],
+    context_insights UUID[],
+    context_jtbds UUID[],
+    context_metrics UUID[],
+    model_used TEXT,
+    temperature DECIMAL(3,2),
+    error_code TEXT,
+    error_message TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'
+);
+
 -- Vector search indexes
 CREATE INDEX ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 CREATE INDEX ON insights USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
@@ -376,6 +475,26 @@ interface ErrorResponse {
 - Trigger: Files >1MB
 - Action: Reject upload
 - User Impact: File size guidance
+
+**CHAT_NOT_FOUND**: Chat session not found or access denied
+- Trigger: Invalid chat_id or unauthorized access
+- Action: Return error
+- User Impact: Redirect to chat list or create new chat
+
+**CHAT_ARCHIVED**: Cannot modify archived chat
+- Trigger: Attempt to send message to archived chat
+- Action: Prevent modification
+- User Impact: Option to restore or create new chat
+
+**CONTEXT_SYNC_ERROR**: Failed to synchronize chat context
+- Trigger: Database update failure for context selections
+- Action: Retry with exponential backoff
+- User Impact: Warning about context state
+
+**MESSAGE_SAVE_FAILED**: Failed to persist message
+- Trigger: Database insert failure during streaming
+- Action: Continue streaming, retry persistence
+- User Impact: Warning about potential message loss
 
 ### Fallback Strategies
 

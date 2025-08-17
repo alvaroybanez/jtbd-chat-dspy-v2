@@ -61,6 +61,34 @@ CREATE INDEX idx_jtbds_created_at ON jtbds(created_at DESC);
 CREATE INDEX idx_jtbds_priority ON jtbds(priority);
 CREATE INDEX idx_jtbds_updated_at ON jtbds(updated_at DESC);
 
+-- Chats table indexes
+CREATE INDEX idx_chats_user_id ON chats(user_id);
+CREATE INDEX idx_chats_created_at ON chats(created_at DESC);
+CREATE INDEX idx_chats_updated_at ON chats(updated_at DESC);
+CREATE INDEX idx_chats_last_message_at ON chats(last_message_at DESC);
+CREATE INDEX idx_chats_status ON chats(status);
+
+-- GIN indexes for array columns in chats
+CREATE INDEX idx_chats_selected_document_ids ON chats USING GIN(selected_document_ids);
+CREATE INDEX idx_chats_selected_insight_ids ON chats USING GIN(selected_insight_ids);
+CREATE INDEX idx_chats_selected_jtbd_ids ON chats USING GIN(selected_jtbd_ids);
+CREATE INDEX idx_chats_selected_metric_ids ON chats USING GIN(selected_metric_ids);
+
+-- Chat messages table indexes
+CREATE INDEX idx_chat_messages_chat_id ON chat_messages(chat_id);
+CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at DESC);
+CREATE INDEX idx_chat_messages_role ON chat_messages(role);
+CREATE INDEX idx_chat_messages_intent ON chat_messages(intent);
+
+-- Composite index for chat message ordering
+CREATE INDEX idx_chat_messages_chat_created ON chat_messages(chat_id, created_at DESC);
+
+-- GIN indexes for array columns in chat_messages
+CREATE INDEX idx_chat_messages_context_chunks ON chat_messages USING GIN(context_document_chunks);
+CREATE INDEX idx_chat_messages_context_insights ON chat_messages USING GIN(context_insights);
+CREATE INDEX idx_chat_messages_context_jtbds ON chat_messages USING GIN(context_jtbds);
+CREATE INDEX idx_chat_messages_context_metrics ON chat_messages USING GIN(context_metrics);
+
 -- Text search indexes using pg_trgm for fuzzy matching
 CREATE INDEX idx_documents_filename_trgm ON documents USING GIN(filename gin_trgm_ops);
 CREATE INDEX idx_documents_content_trgm ON documents USING GIN(content gin_trgm_ops);
@@ -68,17 +96,8 @@ CREATE INDEX idx_metrics_name_trgm ON metrics USING GIN(name gin_trgm_ops);
 CREATE INDEX idx_jtbds_statement_trgm ON jtbds USING GIN(statement gin_trgm_ops);
 
 -- Partial indexes for active/recent records to improve query performance
-CREATE INDEX idx_documents_recent 
-ON documents(created_at DESC) 
-WHERE created_at > NOW() - INTERVAL '30 days';
-
-CREATE INDEX idx_insights_recent 
-ON insights(created_at DESC) 
-WHERE created_at > NOW() - INTERVAL '30 days';
-
-CREATE INDEX idx_hmws_recent 
-ON hmws(created_at DESC) 
-WHERE created_at > NOW() - INTERVAL '30 days';
+-- Note: Time-based partial indexes removed due to IMMUTABLE function requirement
+-- These can be created manually after deployment if needed for specific date ranges
 
 CREATE INDEX idx_solutions_active 
 ON solutions(final_score DESC) 
@@ -93,6 +112,8 @@ CREATE INDEX idx_documents_user_type_date ON documents(user_id, file_type, creat
 CREATE INDEX idx_insights_user_doc_date ON insights(user_id, document_id, created_at DESC);
 CREATE INDEX idx_hmws_user_score ON hmws(user_id, score DESC);
 CREATE INDEX idx_solutions_user_score_status ON solutions(user_id, final_score DESC, status);
+CREATE INDEX idx_chats_user_status_updated ON chats(user_id, status, updated_at DESC);
+CREATE INDEX idx_chat_messages_chat_role_created ON chat_messages(chat_id, role, created_at DESC);
 
 -- Analyze tables to update statistics for query planner
 ANALYZE documents;
@@ -102,6 +123,8 @@ ANALYZE metrics;
 ANALYZE jtbds;
 ANALYZE hmws;
 ANALYZE solutions;
+ANALYZE chats;
+ANALYZE chat_messages;
 
 -- Add comments explaining index choices
 COMMENT ON INDEX idx_document_chunks_embedding IS 'IVFFlat index for cosine similarity search of document chunks';
