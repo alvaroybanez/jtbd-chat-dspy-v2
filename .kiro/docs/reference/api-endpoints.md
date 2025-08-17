@@ -65,15 +65,22 @@ interface ErrorResponse {
 - `solution`/`solve` → create_solutions
 - Default → general_exploration
 
-### Document Management (Planned)
+### Document Management
 
 #### POST /api/v1/upload
 Upload documents for processing and insight extraction.
+
+**Status**: ✅ **IMPLEMENTED**
 
 **Request**: 
 - `Content-Type: multipart/form-data`
 - File types: `.md`, `.txt` only
 - Max size: 1MB
+- Form fields:
+  - `file`: Document file (required)
+  - `user_id`: UUID (required, or via x-user-id header)
+  - `generate_insights`: boolean (optional, default: true)
+  - `generate_embeddings`: boolean (optional, default: true)
 
 **Response**:
 ```typescript
@@ -82,8 +89,21 @@ interface UploadResponse {
   filename: string;
   chunks_created: number;
   insights_generated: number;
+  processing_time?: number;
+  success: true;
 }
 ```
+
+**Error Responses**:
+- `400 BAD_REQUEST`: Invalid file type, size exceeds limit, missing required fields
+- `409 CONFLICT`: Duplicate document (same content hash)
+- `500 INTERNAL_SERVER_ERROR`: Processing or database errors
+
+**Implementation**:
+- File validation and parsing in `/src/lib/services/document-upload/file-parser.ts`
+- Upload orchestration in `/src/lib/services/document-upload/index.ts`
+- Insight extraction in `/src/lib/services/insights/extractor.ts`
+- API endpoint in `/src/app/api/v1/upload/route.ts`
 
 ### JTBD Management (Planned)
 

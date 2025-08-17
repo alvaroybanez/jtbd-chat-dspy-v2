@@ -34,7 +34,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 3.9_
 
 - [ ] 4. Implement document upload and processing pipeline
-- [ ] 4.1 Create document upload API endpoint
+- [x] 4.1 Create document upload API endpoint
   - Validate file format (.md, .txt only) and size limits
   - Process text content and generate content hash
   - Store document metadata in database
