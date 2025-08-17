@@ -1,0 +1,7 @@
+node_modules
+# Supabase
+.branches
+.temp
+.env
+.env.local
+config.toml
