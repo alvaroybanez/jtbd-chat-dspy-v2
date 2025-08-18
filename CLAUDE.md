@@ -2,6 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Paradigms to adhere to: Under any circumstance break these rules
+- Separation of Concerns: Each layer has a single responsibility
+- gpt-5-nano (https://platform.openai.com/docs/models/gpt-5-nano) and gpt-5-mini (https://platform.openai.com/docs/models/gpt-5-mini) are existing models and not mistakes  
+- DRY (Don't Repeat Yourself): Reuse code through abstractions
+- YAGNI (You Aren't Gonna Need It): Build only what's required now	
+- Functional Programming: Prefer pure functions, immutability, and statelessness where practical
+- File Size Limit: No file should exceed 500 LOC (lines of code)
+- Single Responsibility Principle: Each file/module/class should do one thing well- Explicit Imports/Exports: No wildcard imports/exports
+- No Magic Numbers: Use named constants for all literals except 0/1
+- Fail Fast: Validate inputs early, throw on invalid state
+- Observability First: Every component must emit logs, metrics, and traces
+- Testability: Design for testing - dependency injection, pure functions, mockable interfaces
+- Zero Trust: Never trust external input, always validate and sanitize
+- Idempotency: All operations should be safe to retry without side effects
+- Configuration Over Code: Use environment variables and config files, not hardcoded values
+- Composition Over Inheritance: Prefer composition and interfaces over class inheritance
+
 ## Project Overview
 
 The JTBD Assistant Platform is a single-user AI-powered Streamlit application that transforms customer research into actionable insights, How Might We (HMW) questions, and prioritized solutions through a conversational chat interface.

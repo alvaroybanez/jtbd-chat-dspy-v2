@@ -124,8 +124,8 @@ Updated in @docs/task-$ARGUMENTS-plan.md
 "
 Final documentation:
 Update:
-- Mark .kiro/specs/jtbd-assistant-platform/tasks.md $ARGUMENTS as done as soon as everything is approved 
-- @.kiro/docs/completed/$ARGUMENTS.md → Mark as COMPLETED with date
+- Mark .kiro/specs/**/tasks.md $ARGUMENTS as done as soon as everything is approved 
+- @docs/completed_tasks/$ARGUMENTS.md → Mark as COMPLETED with date
 README.md if there are user-facing changes
-- Update .kiro/docs/reference files if needed. For example, if the task is to create a new endpoint, check if it needs to be added to the API reference, and do not create a new file
+- Update @/docs/reference files if needed. For example, if the task is to create a new endpoint, check if it needs to be added to the API reference, and do not create a new file
 
