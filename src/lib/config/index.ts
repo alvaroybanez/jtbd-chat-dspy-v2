@@ -94,7 +94,7 @@ class ConfigurationManager {
     return {
       openai: {
         apiKey: rawEnv.OPENAI_API_KEY,
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-nano',
         embeddingModel: 'text-embedding-3-small',
         maxTokens: rawEnv.OPENAI_MAX_TOKENS ?? 4000,
         temperature: rawEnv.OPENAI_TEMPERATURE ?? 0.7,

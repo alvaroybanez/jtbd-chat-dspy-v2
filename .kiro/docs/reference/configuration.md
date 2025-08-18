@@ -54,7 +54,7 @@ PORT=8000                                     # Server port (default: 8000)
 export const config = {
   openai: {
     apiKey: process.env.OPENAI_API_KEY!,
-    model: 'gpt-4o-mini',                     // Primary chat model
+    model: 'gpt-5-nano',                     // Primary chat model
     embeddingModel: 'text-embedding-3-small'  // 1536-dimension embeddings
   },
   supabase: {
@@ -174,9 +174,9 @@ python -c "from config import config; config.validate(); print('Config valid')"
 ### OpenAI Models
 ```typescript
 const models = {
-  chat: 'gpt-4o-mini',              // Primary chat model (fast, cost-effective)
+  chat: 'gpt-5-nano',              // Primary chat model (fast, cost-effective)
   embedding: 'text-embedding-3-small', // 1536 dimensions, optimal for our use case
-  fallback: 'gpt-4o-mini'           // Fallback when DSPy unavailable
+  fallback: 'gpt-5-nano'           // Fallback when DSPy unavailable
 }
 ```
 

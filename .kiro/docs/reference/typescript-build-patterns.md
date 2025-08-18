@@ -335,6 +335,166 @@ similarity: (result as any).similarity ?? 0
 
 ---
 
+### 8. Test Mock Type Compatibility
+
+**Problem:** Jest mock objects don't satisfy full interface requirements in TypeScript.
+
+**Root Cause:** Mock objects only implement subset of methods but TypeScript expects complete interface.
+
+```typescript
+// Test mock fails TypeScript
+const mockClient = {
+  from: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  single: jest.fn()
+}
+await operation(mockClient) // ERROR: missing properties from SupabaseClient
+```
+
+**Solution:** Use strategic type assertions for test mocks while maintaining type safety in production code.
+
+```typescript
+// Before (fails type checking)
+await operation(mockClient)
+
+// After (safe for tests with proper typing)
+await operation(mockClient as any)
+
+// Alternative: Create minimal mock interfaces for complex types
+interface MockSupabaseClient {
+  from: jest.Mock
+  select: jest.Mock  
+  eq: jest.Mock
+  single: jest.Mock
+}
+
+const mockClient: MockSupabaseClient = {
+  from: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  single: jest.fn()
+}
+
+// Use with assertion only when passing to functions expecting full interface
+await operation(mockClient as any)
+```
+
+**Benefits:**
+- Maintains test functionality while satisfying TypeScript
+- Clearly identifies test-only type assertions
+- Allows comprehensive mocking without implementing unused methods
+- Separates test concerns from production type safety
+
+**Files Affected:** 
+- `src/lib/services/metrics/__tests__/index.test.ts`
+- `src/lib/services/jtbd/__tests__/index.test.ts`
+
+---
+
+### 9. Zod Schema Decimal Precision Validation
+
+**Problem:** Database decimal constraints require custom validation beyond basic number types.
+
+**Root Cause:** Standard Zod number validation doesn't enforce decimal precision limits.
+
+```typescript
+// Basic validation insufficient
+z.number() // Allows any number, no decimal precision control
+```
+
+**Solution:** Create custom Zod refinements for decimal precision validation.
+
+```typescript
+// Before (insufficient validation)
+current_value: z.number().optional()
+
+// After (enforces database constraints)
+const decimalSchema = z
+  .number()
+  .finite('Value must be a finite number')
+  .refine((val) => {
+    const decimalParts = String(Math.abs(val)).split('.')
+    return decimalParts.length <= 1 || decimalParts[1].length <= 2
+  }, 'Value cannot have more than 2 decimal places')
+
+// Usage in schema
+current_value: decimalSchema.optional().nullable()
+```
+
+**Benefits:**
+- Matches database decimal(12,2) constraints exactly
+- Provides clear error messages for validation failures
+- Handles edge cases (negative numbers, integers)
+- Reusable across multiple schemas
+
+**Files Affected:** `src/app/api/v1/metrics/route.ts`
+
+---
+
+### 10. Service Layer Error Boundary Patterns
+
+**Problem:** Service methods need consistent error handling with proper type propagation.
+
+**Root Cause:** Database errors and validation errors require different handling strategies.
+
+```typescript
+// Inconsistent error handling
+try {
+  const result = await db.executeQuery(...)
+  if (!result) {
+    throw new Error('Failed') // Generic error loses context
+  }
+} catch (error) {
+  // Lost type information and context
+  throw error
+}
+```
+
+**Solution:** Create typed error boundaries with context preservation.
+
+```typescript
+// Improved error handling pattern
+try {
+  const result = await db.executeQuery<ExpectedType>(...)
+  
+  if (!result) {
+    throw new DatabaseError(
+      'Failed to insert metric into database'
+    )
+  }
+  
+  return result
+} catch (error) {
+  if (error instanceof ValidationError) {
+    throw error // Re-throw validation errors as-is
+  }
+  
+  logger.error('Database operation failed', {
+    error: error instanceof Error ? error.message : String(error),
+    operation: 'metric_creation',
+    context: { userId, metricName }
+  })
+  
+  throw new DatabaseError(
+    'Database operation failed',
+    error instanceof Error ? error : new Error(String(error))
+  )
+}
+```
+
+**Benefits:**
+- Preserves error types through the call stack
+- Provides consistent error context
+- Separates validation errors from system errors
+- Enables proper error recovery strategies
+
+**Files Affected:**
+- `src/lib/services/metrics/index.ts`
+- `src/lib/services/jtbd/index.ts`
+
+---
+
 ## Best Practices Derived (Updated)
 
 ### 1. Type Safety First
@@ -342,6 +502,7 @@ similarity: (result as any).similarity ?? 0
 - Use nullish coalescing (`??`) for numeric values where 0 is valid
 - Centralize type assertions in well-documented adapter functions
 - Avoid `any` by creating specific helper functions
+- Use strategic `as any` only in test mocks, not production code
 
 ### 2. Logger Integration  
 - Create safe logging helpers that handle serialization
@@ -367,6 +528,18 @@ similarity: (result as any).similarity ?? 0
 - Handle edge cases (null, undefined, non-objects) gracefully
 - Use Number() for safe numeric conversion instead of type assertion
 
+### 6. Schema Validation Patterns
+- Create custom Zod refinements for database constraint validation
+- Match validation rules exactly with database schema constraints
+- Use reusable validation schemas across related endpoints
+- Provide clear, user-friendly error messages for validation failures
+
+### 7. Test Mock Strategy
+- Use `as any` assertions strategically for mock objects in tests only
+- Create minimal mock interfaces when full interface implementation is impractical
+- Separate test type concerns from production type safety
+- Document test-specific type assertions clearly
+
 ## Migration Guidelines (Updated)
 
 When encountering similar errors:
@@ -386,5 +559,27 @@ Watch for these recurring patterns:
 - New external library integrations
 - Database schema changes affecting type inference
 - API response format changes
+- Test mock objects causing TS2345 errors (missing interface properties)
+- Custom validation schemas not matching database constraints
+- Service layer error handling inconsistencies
+
+## Recent Pattern Additions (2025-08-18)
+
+Based on metrics service implementation:
+
+### Test Mock Type Safety
+- **Issue**: Mock objects in tests don't satisfy full interface requirements
+- **Solution**: Strategic `as any` usage in test contexts only
+- **Prevention**: Create mock interfaces for complex types when possible
+
+### Database Constraint Validation
+- **Issue**: Zod schemas don't match database decimal precision limits
+- **Solution**: Custom refinement functions with proper error messages
+- **Prevention**: Align validation schemas directly with database schema definitions
+
+### Service Error Boundaries
+- **Issue**: Inconsistent error handling loses type information and context
+- **Solution**: Typed error boundaries with proper error type preservation
+- **Prevention**: Standardized error handling patterns across service layer
 
 Regular TypeScript version updates may resolve some of these issues, but maintaining backward compatibility requires careful testing.

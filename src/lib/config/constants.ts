@@ -51,8 +51,8 @@ export const SCORING = {
 
 // OpenAI Model Configuration
 export const OPENAI_MODELS = {
-  CHAT_PRIMARY: 'gpt-4o-mini',           // Primary chat model
-  CHAT_FALLBACK: 'gpt-4o-mini',          // Fallback chat model
+  CHAT_PRIMARY: 'gpt-5-nano',           // Primary chat model
+  CHAT_FALLBACK: 'gpt-5-nano',          // Fallback chat model
   EMBEDDING: 'text-embedding-3-small',   // Embedding model
   MAX_TOKENS_CHAT: 4000,                 // Maximum tokens for chat completion
   MAX_TOKENS_GENERATION: 2000,           // Maximum tokens for content generation

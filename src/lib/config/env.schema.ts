@@ -14,7 +14,7 @@ const EnvironmentSchema = z.enum(['development', 'staging', 'production'])
 // OpenAI configuration schema
 const OpenAIConfigSchema = z.object({
   apiKey: z.string().min(1, 'OpenAI API key is required'),
-  model: z.string().default('gpt-4o-mini'),
+  model: z.string().default('gpt-5-nano'),
   embeddingModel: z.string().default('text-embedding-3-small'),
   maxTokens: z.number().int().positive().default(4000),
   temperature: z.number().min(0).max(2).default(0.7),
