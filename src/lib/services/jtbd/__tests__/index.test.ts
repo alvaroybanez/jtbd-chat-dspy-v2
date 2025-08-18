@@ -58,7 +58,7 @@ describe('JTBD Service', () => {
       }
 
       try {
-        const result = await operation(mockClient)
+        const result = await operation(mockClient as any)
         return result.data
       } catch (error) {
         // Default successful responses

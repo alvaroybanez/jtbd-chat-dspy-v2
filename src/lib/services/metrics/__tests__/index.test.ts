@@ -434,7 +434,7 @@ describe('Metrics Service', () => {
           single: jest.fn().mockImplementation(() => {
             throw new Error('Database error')
           })
-        }
+        } as any
         await operation(mockClient)
       })
 
@@ -502,7 +502,7 @@ describe('Metrics Service', () => {
           range: jest.fn().mockImplementation(() => {
             throw new Error('Database error')
           })
-        }
+        } as any
         await operation(mockClient)
       })
 
@@ -529,7 +529,7 @@ describe('Metrics Service', () => {
           limit: jest.fn().mockImplementation(() => {
             throw new Error('Database connection failed')
           })
-        }
+        } as any
         await operation(mockClient)
       })
 
