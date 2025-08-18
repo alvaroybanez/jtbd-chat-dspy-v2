@@ -405,19 +405,11 @@ interface GenerateHMWResponse {
 ```
 
 #### POST /api/intelligence/create_solutions
-Generate prioritized solutions using DSPy.
+Generate prioritized solutions using DSPy with intelligent metric assignment.
 
-**Status**: 🚧 Endpoint structure implemented, DSPy logic pending
+**Status**: ✅ **FULLY IMPLEMENTED** with DSPy ChainOfThought
 
-**Current Response**:
-```json
-{
-  "solutions": [],
-  "meta": {"duration_ms": 0, "retries": 0}
-}
-```
-
-**Planned Request**:
+**Request**:
 ```typescript
 interface CreateSolutionsRequest {
   hmws: Array<{
@@ -435,7 +427,7 @@ interface CreateSolutionsRequest {
 }
 ```
 
-**Planned Response**:
+**Response**:
 ```typescript
 interface CreateSolutionsResponse {
   solutions: Array<{
@@ -457,6 +449,81 @@ interface CreateSolutionsResponse {
     model_used: string;
     fallback_metric_used?: boolean;
   };
+}
+```
+
+**Key Features**:
+- **Two-step DSPy generation**: Context summarization followed by solution generation
+- **Intelligent metric assignment**: Relevance-based algorithm assigns optimal metrics to solutions
+- **Impact/effort scoring**: Solutions scored 1-10 for both impact and effort with automatic final score calculation
+- **Solution prioritization**: Results sorted by final score (impact/effort ratio) for maximum ROI
+- **Fallback generation**: Context-aware fallback when DSPy services unavailable
+- **Source tracking**: Complete relationship tracking for insights, metrics, JTBDs, and HMWs
+
+**Example Request**:
+```json
+{
+  "hmws": [
+    {
+      "id": "hmw_1",
+      "question": "How might we improve user onboarding completion rates?",
+      "score": 8.5
+    }
+  ],
+  "context": {
+    "metrics": [
+      {
+        "id": "metric_1",
+        "name": "Onboarding Completion Rate",
+        "description": "Percentage of users who complete onboarding"
+      },
+      {
+        "id": "metric_2", 
+        "name": "User Engagement Score",
+        "description": "Daily active user engagement rating"
+      }
+    ],
+    "insights": [
+      {
+        "id": "insight_1",
+        "content": "Users drop off during the account verification step"
+      }
+    ],
+    "jtbds": [
+      {
+        "id": "jtbd_1",
+        "statement": "Complete account setup quickly and confidently"
+      }
+    ]
+  },
+  "count": 3
+}
+```
+
+**Example Response**:
+```json
+{
+  "solutions": [
+    {
+      "title": "Streamlined Verification Process",
+      "description": "Implement one-click email verification with backup SMS option to eliminate friction in account setup",
+      "impact_score": 9,
+      "effort_score": 4,
+      "final_score": 2.25,
+      "assigned_metrics": ["metric_1"],
+      "source_references": {
+        "hmw_ids": ["hmw_1"],
+        "jtbd_ids": ["jtbd_1"],
+        "insight_ids": ["insight_1"]
+      }
+    }
+  ],
+  "meta": {
+    "duration_ms": 1250,
+    "retries": 0,
+    "model_used": "gpt-5-nano",
+    "fallback_metric_used": false
+  }
 }
 ```
 
@@ -649,7 +716,6 @@ const budgetStatus = await tokenBudgetManager.getBudgetStatus(messages, contextI
 - HMW and solution generation endpoints
 
 ### ⏳ Planned
-- **DSPy solution generation** (Task 6.3 - HMW generation completed)
 - **Chat orchestration** with streaming responses
 - **Comprehensive API error handling** improvements
 - **Fallback generation services** for DSPy failures

@@ -78,7 +78,7 @@
   - Generate scored HMWs with source references
   - _Requirements: 4.2, 4.3, 4.7_
 
-- [ ] 6.3 Build solution creation endpoint with intelligent metric assignment
+- [x] 6.3 Build solution creation endpoint with intelligent metric assignment
   - Create DSPy signature for solution generation
   - Implement intelligent metric selection logic
   - Generate solutions with impact/effort scoring
