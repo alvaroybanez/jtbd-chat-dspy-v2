@@ -44,17 +44,6 @@ export {
 export {
   chatSessionManager,
   ChatSessionManagerImpl,
-  type ChatSessionManager,
-  type ChatContext,
-  type ChatWithMessagesAndContext,
-  type MessageInput,
-  type MessageOptions,
-  type ListChatsOptions,
-  type PaginatedChats,
-  type ChatCreateResult,
-  type ChatLoadResult,
-  CHAT_SESSION_DEFAULTS,
-  CHAT_SESSION_ERROR_CODES
 } from './session-manager'
 
 export * from './session-types'
@@ -68,3 +57,14 @@ export {
   type MessagePersistenceResult,
   type StreamingMessagePersistenceContext
 } from './message-persistence-pipeline'
+
+// ===== CONTEXT MANAGEMENT SYSTEM =====
+export {
+  contextManager,
+  ContextManagerImpl,
+  ContextError,
+  ContextLimitError,
+  ContextItemNotFoundError
+} from './context-manager'
+
+export * from './context-types'
