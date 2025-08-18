@@ -40,13 +40,13 @@
   - Store document metadata in database
   - _Requirements: 1.1, 1.3, 1.4_
 
-- [ ] 4.2 Build document chunking and embedding pipeline
+- [x] 4.2 Build document chunking and embedding pipeline
   - Chunk document content with appropriate overlap
   - Generate embeddings for all chunks using OpenAI
   - Store chunks with embeddings in database
   - _Requirements: 1.1, 1.5_
 
-- [ ] 4.3 Implement automatic insight extraction
+- [x] 4.3 Implement automatic insight extraction
   - Extract insights from document chunks using AI
   - Generate embeddings for insights
   - Store insights with document relationships

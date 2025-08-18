@@ -306,9 +306,58 @@ Only include insights with confidence >= ${minConfidenceScore}.
         insightTexts.map((text, index) => ({ id: `insight_${index}`, text }))
       )
 
-      // For now, return original insights
-      // In the future, could implement similarity clustering
-      return insights
+      // Implement similarity-based merging
+      const similarityThreshold = 0.85 // High threshold to avoid false merges
+      const merged: ExtractedInsight[] = []
+      const processed = new Set<number>()
+
+      for (let i = 0; i < insights.length; i++) {
+        if (processed.has(i)) continue
+
+        const baseInsight = insights[i]
+        const similarIndices = [i]
+        
+        // Find similar insights
+        for (let j = i + 1; j < insights.length; j++) {
+          if (processed.has(j)) continue
+
+          const similarity = this.calculateCosineSimilarity(
+            embeddings[i].embedding,
+            embeddings[j].embedding
+          )
+
+          if (similarity >= similarityThreshold) {
+            similarIndices.push(j)
+          }
+        }
+
+        // Mark all similar insights as processed
+        similarIndices.forEach(idx => processed.add(idx))
+
+        if (similarIndices.length > 1) {
+          // Merge similar insights
+          const similarInsights = similarIndices.map(idx => insights[idx])
+          const mergedInsight = this.mergeSimilarInsights(similarInsights)
+          merged.push(mergedInsight)
+          
+          logger.debug('Merged similar insights', {
+            originalCount: similarIndices.length,
+            similarity: similarIndices.length > 1 ? 'above_threshold' : 'unique',
+            mergedContent: mergedInsight.content.substring(0, 100)
+          })
+        } else {
+          // Keep unique insight as-is
+          merged.push(baseInsight)
+        }
+      }
+
+      logger.debug('Insight merging completed', {
+        originalCount: insights.length,
+        mergedCount: merged.length,
+        reductionPercentage: Math.round((1 - merged.length / insights.length) * 100)
+      })
+
+      return merged
 
     } catch (error) {
       logger.warn('Failed to merge related insights', {
@@ -317,6 +366,68 @@ Only include insights with confidence >= ${minConfidenceScore}.
       })
 
       return insights
+    }
+  }
+
+  /**
+   * Calculate cosine similarity between two embedding vectors
+   */
+  private calculateCosineSimilarity(vectorA: number[], vectorB: number[]): number {
+    if (vectorA.length !== vectorB.length) {
+      throw new Error('Vectors must have the same length')
+    }
+
+    let dotProduct = 0
+    let normA = 0
+    let normB = 0
+
+    for (let i = 0; i < vectorA.length; i++) {
+      dotProduct += vectorA[i] * vectorB[i]
+      normA += vectorA[i] * vectorA[i]
+      normB += vectorB[i] * vectorB[i]
+    }
+
+    normA = Math.sqrt(normA)
+    normB = Math.sqrt(normB)
+
+    if (normA === 0 || normB === 0) {
+      return 0
+    }
+
+    return dotProduct / (normA * normB)
+  }
+
+  /**
+   * Merge similar insights into a single insight
+   */
+  private mergeSimilarInsights(insights: ExtractedInsight[]): ExtractedInsight {
+    if (insights.length === 1) {
+      return insights[0]
+    }
+
+    // Use the insight with highest confidence as the base
+    const sortedByConfidence = [...insights].sort((a, b) => b.confidenceScore - a.confidenceScore)
+    const baseInsight = sortedByConfidence[0]
+
+    // Combine all source chunk IDs
+    const allSourceChunkIds = insights.reduce((acc, insight) => {
+      insight.sourceChunkIds.forEach(id => {
+        if (!acc.includes(id)) {
+          acc.push(id)
+        }
+      })
+      return acc
+    }, [] as UUID[])
+
+    // Calculate average confidence score
+    const averageConfidence = insights.reduce((sum, insight) => sum + insight.confidenceScore, 0) / insights.length
+
+    // For content, we keep the highest confidence insight's content
+    // In a more sophisticated implementation, we could use AI to merge the content
+    return {
+      content: baseInsight.content,
+      confidenceScore: Math.min(0.95, averageConfidence), // Cap at 0.95 to indicate merged content
+      sourceChunkIds: allSourceChunkIds
     }
   }
 
