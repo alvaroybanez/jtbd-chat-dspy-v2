@@ -2,10 +2,10 @@
 
 - [ ] 1. Set up database schema and core infrastructure
   - Create Supabase database tables with proper relationships and constraints
-  - Implement org-scoped deduplication to prevent cross-session collisions
-  - Add vector search RPC function with org filtering for session isolation
-  - Create LLM traces table for observability without full prompt registry
-  - _Requirements: 7.1, 7.2, 8.1, 9.1, 9.2_
+  - Add simple vector search RPC function
+  - Create LLM traces table for observability
+  - Enable pgvector extension and create vector indexes
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [ ] 2. Implement document processing with caching
   - Create document upload handler with file size and format validation
@@ -15,16 +15,16 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
 - [ ] 3. Build vector search and chat exploration
-  - Implement org-filtered vector search using Supabase RPC
+  - Implement vector search using Supabase RPC
   - Create chat interface for document exploration and context building
   - Add structured response display with selection buttons for insights, JTBDs, and metrics
-  - Implement session state management for user context
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9_
+  - Implement Streamlit session state management for user context
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
 
 - [ ] 4. Create manual JTBD and metric input
   - Build sidebar forms for manual JTBD creation with embedding generation
   - Implement metric creation interface with current/target values
-  - Add validation and storage with org-scoped deduplication
+  - Add validation and storage
   - Ensure created items are available for chat exploration and selection
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
@@ -49,12 +49,11 @@
   - Add file size validation and format checking with appropriate error messages
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 8. Implement session management and demo safety
-  - Create demo session isolation with auto-generated session IDs
-  - Add session-based data scoping for all database operations
-  - Implement 24-hour auto-cleanup for demo data
-  - Add sample data initialization for new demo sessions
-  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+- [ ] 8. Implement basic session management
+  - Create Streamlit session state management for user context
+  - Add basic data persistence and retrieval
+  - Implement simple session initialization
+  - _Requirements: 3.1, 3.4, 3.5_
 
 - [ ] 9. Create main Streamlit application
   - Build main UI with sidebar for uploads and manual input
@@ -68,5 +67,5 @@
   - Create Streamlit secrets configuration template
   - Add environment variable setup for API keys
   - Implement client initialization with proper error handling
-  - Create deployment-ready configuration with security best practices
-  - _Requirements: 8.1, 8.2, 8.4_
+  - Create basic deployment configuration
+  - _Requirements: Basic setup and configuration_

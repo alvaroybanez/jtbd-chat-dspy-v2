@@ -2,7 +2,7 @@
 
 ## Overview
 
-The JTBD Assistant Platform is a single Streamlit Python application (app.py) that uses OpenAI for intelligent content generation with optional DSPy enhancement. The system uses Supabase with pgvector for document storage and semantic search, enabling rapid transformation of research artifacts into actionable solutions. The MVP focuses on session isolation, embedding caching, and lightweight LLM trace logging for observability without complexity.
+The JTBD Assistant Platform is a single-user Streamlit Python application that uses OpenAI for intelligent content generation with optional DSPy enhancement. The system uses Supabase with pgvector for document storage and semantic search, enabling rapid transformation of research artifacts into actionable solutions. The MVP focuses on simplicity, embedding caching, and lightweight LLM trace logging for observability.
 
 ## Architecture
 
@@ -49,14 +49,14 @@ graph TB
 **Purpose**: Handle document upload, chunking, embedding, and insight extraction
 
 **Key Functions**:
-- `process_document(file, session_id)`: Main processing pipeline
+- `process_document(file)`: Main processing pipeline
 - `generate_embedding(text)`: Cached 1536-dim vectors via OpenAI
 - `_cached_embedding(text_hash, model)`: Streamlit cached embedding function
-- `extract_insights(chunks, doc_id)`: AI-powered insight extraction using LLM wrapper
+- `extract_insights(chunks, doc_id)`: AI-powered insight extraction
 
 **Caching Strategy**:
 - Embedding cache with 1-hour TTL to reduce latency and cost
-- Cache keyed by text hash for deduplication
+- Cache keyed by text hash
 - Optional cache bypass toggle for debugging
 
 **Error Handling**:
@@ -66,17 +66,12 @@ graph TB
 
 ### 2. Vector Search Component
 
-**Purpose**: Org-filtered semantic search across document chunks
+**Purpose**: Semantic search across document chunks
 
 **Key Functions**:
-- `search_documents(query, session_id)`: pgvector similarity search via RPC
-- `search_similar_chunks(query_embedding, match_count, similarity_threshold, filter_org_id)`: Org-filtered RPC
+- `search_documents(query)`: pgvector similarity search
+- `search_similar_chunks(query_embedding, match_count, similarity_threshold)`: Simple RPC
 - `rank_results(results)`: Score and sort by relevance
-
-**Session Isolation**:
-- RPC function joins with documents table to filter by org_id
-- Prevents cross-session data leakage in vector search
-- Maintains performance with proper indexing
 
 **Performance Considerations**:
 - ivfflat indexes for vector operations
@@ -88,7 +83,7 @@ graph TB
 **Purpose**: Conversational exploration and context building
 
 **Key Functions**:
-- `process_chat(message, session_id)`: Route chat messages
+- `process_chat(message)`: Route chat messages
 - `display_structured_response(data)`: Present results with selection buttons
 - `build_context(selections)`: Aggregate user selections in session state
 - `main()`: Streamlit UI orchestration
@@ -103,7 +98,7 @@ graph TB
 **Purpose**: Centralized LLM calls with trace logging and error handling
 
 **Key Functions**:
-- `call_llm(template_key, rendered_prompt, vars, session_id, model)`: Unified LLM interface
+- `call_llm(template_key, prompt, model)`: Unified LLM interface
 - `clamp_text(text, limit)`: Token budget enforcement with truncation
 - Automatic trace logging to `llm_traces` table
 - Structured error handling with retry logic
@@ -118,7 +113,7 @@ graph TB
 **Purpose**: Generate How Might We questions from selected context
 
 **Key Functions**:
-- `generate_hmws(context, session_id)`: Uses LLM wrapper with trace logging
+- `generate_hmws(context)`: Uses LLM wrapper with trace logging
 - `try_dspy_hmw(context)`: Optional DSPy module integration
 - `fallback_hmw_generation(context)`: OpenAI via LLM wrapper
 - `persist_hmws(hmws, context)`: Store with relationships
@@ -133,15 +128,15 @@ graph TB
 **Purpose**: Generate prioritized solutions from HMWs
 
 **Key Functions**:
-- `generate_solutions(hmw_id, session_id)`: Uses LLM wrapper with trace logging
+- `generate_solutions(hmw_id)`: Uses LLM wrapper with trace logging
 - `try_dspy_solutions(hmws)`: Optional DSPy module integration
-- `intelligent_metric_assignment(solutions)`: Per-session metric fallback
+- `intelligent_metric_assignment(solutions)`: Automatic metric selection
 - `score_solutions(solutions)`: Calculate final scores
 
-**Per-Session Metric Fallback**:
-- Check for session-specific metrics first
-- Create session default metric if none exist
-- Avoid global metric contamination across sessions
+**Metric Assignment**:
+- Automatically select appropriate metrics from available options
+- Create default metric if none exist
+- Link solutions to relevant metrics
 
 **Scoring Algorithm**:
 - Final Score = (Impact × 0.6) + ((10 - Effort) × 0.4)
@@ -153,13 +148,11 @@ graph TB
 ### Core Entities
 
 ```sql
--- Documents with deduplication
+-- Documents
 documents {
   id: UUID (PK)
-  org_id: VARCHAR(50) -- session isolation
   title: VARCHAR(255)
   content: TEXT
-  content_hash: VARCHAR(64) UNIQUE -- deduplication
   embedding: vector(1536)
   created_at: TIMESTAMP
 }
@@ -171,63 +164,57 @@ document_chunks {
   chunk_index: INT
   content: TEXT
   embedding: vector(1536) -- indexed with ivfflat
-  start_char: INT
-  end_char: INT
+  created_at: TIMESTAMP
 }
 
 -- Extracted insights
 insights {
   id: UUID (PK)
-  org_id: VARCHAR(50)
   description: TEXT
   document_id: UUID (FK)
-  confidence_score: FLOAT
   embedding: vector(1536)
-  dedupe_hash: VARCHAR(64) UNIQUE
+  created_at: TIMESTAMP
 }
 
 -- User-defined JTBDs
 jtbds {
   id: UUID (PK)
-  org_id: VARCHAR(50)
   statement: TEXT
   context: TEXT
   outcome: TEXT
   embedding: vector(1536)
-  dedupe_hash: VARCHAR(64)
+  created_at: TIMESTAMP
 }
 
 -- Performance metrics
 metrics {
   id: UUID (PK)
-  org_id: VARCHAR(50)
   name: VARCHAR(255)
-  current_value: NUMERIC(12,2)
-  target_value: NUMERIC(12,2)
+  current_value: NUMERIC
+  target_value: NUMERIC
   unit: VARCHAR(50)
+  created_at: TIMESTAMP
 }
 
 -- Generated HMW questions
 hmws {
   id: UUID (PK)
-  org_id: VARCHAR(50)
   question: TEXT CHECK (question LIKE 'How might we%')
   priority: FLOAT
-  dedupe_hash: VARCHAR(64) UNIQUE
+  created_at: TIMESTAMP
 }
 
 -- Generated solutions
 solutions {
   id: UUID (PK)
-  org_id: VARCHAR(50)
   title: VARCHAR(255)
   description: TEXT
   customer_benefit: TEXT
   user_journey: TEXT
-  impact_score: INT CHECK (1-10)
-  effort_score: INT CHECK (1-10)
+  impact_score: INT CHECK (impact_score >= 1 AND impact_score <= 10)
+  effort_score: INT CHECK (effort_score >= 1 AND effort_score <= 10)
   final_score: FLOAT
-  dedupe_hash: VARCHAR(64) UNIQUE
+  created_at: TIMESTAMP
 }
 ```
 
@@ -242,31 +229,20 @@ solutions_hmws (solution_id, hmw_id)
 solutions_metrics (solution_id, metric_id)
 ```
 
-### Session Isolation and Deduplication
-
-- All entities include `org_id` field with `demo_xxxxx` format
-- Org-scoped deduplication prevents cross-session collisions
-- Vector search RPC includes org filtering for proper isolation
-- 24-hour auto-cleanup via scheduled function
-- Per-session metric fallback instead of global default
-
 ### LLM Observability
 
 ```sql
--- Lightweight trace table for prompt/response logging
+-- Simple trace table for prompt/response logging
 llm_traces {
   id: UUID (PK)
-  session_id: TEXT
   template_key: TEXT -- e.g., "insights.extract", "hmw.synthesize"
   model: TEXT
-  rendered_prompt: TEXT
-  input_vars: JSONB
+  prompt: TEXT
   response: TEXT
-  tokens_prompt: INT
-  tokens_completion: INT
+  tokens_used: INT
   latency_ms: INT
   error: TEXT
-  created_at: TIMESTAMPTZ
+  created_at: TIMESTAMP
 }
 ```
 
