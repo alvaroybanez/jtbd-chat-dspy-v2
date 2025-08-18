@@ -91,10 +91,10 @@ class ConfigurationManager {
       return RawEnvironmentSchema.parse({
         NODE_ENV: 'development',
         // Browser-safe defaults - these will be overridden by server-side config
-        OPENAI_API_KEY: 'browser-placeholder',
-        SUPABASE_URL: 'browser-placeholder',
-        SUPABASE_ANON_KEY: 'browser-placeholder',
-        DSPY_API_KEY: 'browser-placeholder',
+        OPENAI_API_KEY: 'browser-placeholder-key',
+        SUPABASE_URL: 'https://placeholder.local',
+        SUPABASE_ANON_KEY: 'browser-placeholder-key',
+        DSPY_API_KEY: 'browser-placeholder-key',
       })
     }
     return RawEnvironmentSchema.parse(process.env)

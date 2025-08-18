@@ -107,6 +107,11 @@ export type Environment = z.infer<typeof EnvironmentSchema>
 
 // Helper function to determine environment
 export const getEnvironment = (): Environment => {
+  // Check if we're in a browser environment
+  if (typeof process === 'undefined' || !process.env) {
+    return 'development'
+  }
+  
   const nodeEnv = process.env.NODE_ENV as string | undefined
   
   if (nodeEnv === 'production') return 'production'
