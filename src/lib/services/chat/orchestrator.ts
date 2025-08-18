@@ -13,12 +13,16 @@ import contextRetrievalService from './context-retrieval'
 import { MessagePersistencePipeline } from './message-persistence-pipeline'
 import { ChatSessionManagerImpl } from './session-manager'
 import { tokenBudgetManager } from './token-budget'
+import { contextManager } from './context-manager'
+import { hmwService } from '../intelligence/hmw-service'
+import { executeQuery } from '../../database/client'
 import { 
   ChatSessionError,
   ValidationError,
   ChatNotFoundError
 } from '../../errors'
-import type { UUID } from '../../database/types'
+import type { UUID, HMWInsert } from '../../database/types'
+import type { HMWContext, HMWResult, SourceReferences } from '../intelligence/types'
 
 // ===== ORCHESTRATOR TYPES =====
 
@@ -588,26 +592,223 @@ export class ChatOrchestrator {
     chatId: UUID,
     startTime: number
   ): Promise<void> {
-    // TODO: Implement HMW generation with DSPy service and fallback
-    // For now, send placeholder response
-    const contextChunk: ChatStreamChunk = {
-      type: 'context',
-      content: 'HMW generation will be integrated with DSPy service',
-      data: {
-        type: 'hmw_generation',
-        placeholder: true
-      }
-    }
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+    const contextId = `ctx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const pickerId = `picker_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    await this.persistAssistantMessage(
-      chatId,
-      request.userId,
-      'HMW generation will be integrated with DSPy service',
-      'generate_hmw',
-      Date.now() - startTime,
-      50
-    )
+    try {
+      // 1. Send loading state
+      const loadingChunk: ChatStreamChunk = {
+        type: 'context',
+        content: 'Analyzing selected context to generate How Might We questions...',
+        data: {
+          id: contextId,
+          type: 'hmw_loading',
+          status: 'loading',
+          message: 'Building context and generating HMW questions...'
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadingChunk)}\n\n`))
+
+      // 2. Load context for HMW generation
+      const contextResult = await contextManager.loadContextWithData(chatId, request.userId)
+      const { context } = contextResult
+
+      // 3. Validate context and build HMWContext
+      if (context.totalItems === 0) {
+        throw new ValidationError(
+          'No context selected. Please select insights, metrics, or JTBDs to generate How Might We questions.',
+          'NO_CONTEXT_SELECTED'
+        )
+      }
+
+      // 4. Get properly typed context data from database directly
+      const insightsData = context.insights.length > 0 
+        ? await executeQuery<Array<{id: UUID, content: string}>>(async (client) =>
+            client
+              .from('insights')
+              .select('id, content')
+              .in('id', context.insights.map(i => i.id))
+              .eq('user_id', request.userId)
+          ) || []
+        : []
+      
+      const metricsData = context.metrics.length > 0
+        ? await executeQuery<Array<{id: UUID, name: string, description: string | null, current_value: number | null, target_value: number | null, unit: string}>>(async (client) =>
+            client
+              .from('metrics')
+              .select('id, name, description, current_value, target_value, unit')
+              .in('id', context.metrics.map(m => m.id))
+              .eq('user_id', request.userId)
+          ) || []
+        : []
+        
+      const jtbdsData = context.jtbds.length > 0
+        ? await executeQuery<Array<{id: UUID, statement: string, context: string | null, priority: number | null}>>(async (client) =>
+            client
+              .from('jtbds')
+              .select('id, statement, context, priority')
+              .in('id', context.jtbds.map(j => j.id))
+              .eq('user_id', request.userId)
+          ) || []
+        : []
+
+      const hmwContext: HMWContext = {
+        insights: insightsData.map(item => ({
+          id: item.id,
+          content: item.content
+        })),
+        metrics: metricsData.map(item => ({
+          id: item.id,
+          name: item.name,
+          description: item.description || undefined,
+          current_value: item.current_value || undefined,
+          target_value: item.target_value || undefined,
+          unit: item.unit
+        })),
+        jtbds: jtbdsData.map(item => ({
+          id: item.id,
+          statement: item.statement,
+          context: item.context || undefined,
+          priority: item.priority || undefined
+        }))
+      }
+
+      // 4. Generate HMW questions using service
+      const hmwResponse = await hmwService.generateHMW(hmwContext, {
+        count: 8,
+        temperature: 0.7
+      })
+
+      // 5. Persist HMWs to database
+      const persistedHMWs: Array<{ id: UUID; question: string; score: number; source_references: SourceReferences }> = []
+      
+      for (const hmw of hmwResponse.hmws) {
+        const hmwData: HMWInsert = {
+          user_id: request.userId,
+          question: hmw.question,
+          score: hmw.score,
+          insight_ids: hmw.source_references.insight_ids,
+          metric_ids: hmw.source_references.metric_ids,
+          jtbd_ids: hmw.source_references.jtbd_ids,
+          generation_method: hmwResponse.meta.generation_method
+        }
+
+        try {
+          const insertedHMW = await executeQuery<{id: UUID, question: string, score: number, insight_ids: UUID[], metric_ids: UUID[], jtbd_ids: UUID[]}>(async (client) =>
+            client
+              .from('hmws')
+              .insert(hmwData)
+              .select('id, question, score, insight_ids, metric_ids, jtbd_ids')
+              .single()
+          )
+
+          if (insertedHMW) {
+            persistedHMWs.push({
+              id: insertedHMW.id,
+              question: insertedHMW.question,
+              score: insertedHMW.score,
+              source_references: {
+                insight_ids: insertedHMW.insight_ids,
+                metric_ids: insertedHMW.metric_ids,
+                jtbd_ids: insertedHMW.jtbd_ids
+              }
+            })
+          }
+        } catch (insertError) {
+          logger.error('Failed to persist HMW', { error: insertError, hmwData })
+          throw new Error(`Failed to persist HMW: ${insertError instanceof Error ? insertError.message : String(insertError)}`)
+        }
+      }
+
+      // 6. Send loaded state with results
+      const loadedChunk: ChatStreamChunk = {
+        type: 'context',
+        content: `Generated ${persistedHMWs.length} How Might We questions based on your selected context`,
+        data: {
+          id: contextId,
+          type: 'hmw_loaded',
+          status: 'loaded',
+          results: persistedHMWs,
+          generation_method: hmwResponse.meta.generation_method,
+          context_summary: {
+            insights_count: hmwContext.insights.length,
+            metrics_count: hmwContext.metrics.length,
+            jtbds_count: hmwContext.jtbds.length
+          }
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadedChunk)}\n\n`))
+
+      // 7. Send picker interface for selecting HMWs
+      const pickerItems = persistedHMWs.map(hmw => ({
+        id: hmw.id,
+        type: 'hmw' as const,
+        title: hmw.question,
+        content: hmw.question,
+        score: hmw.score,
+        metadata: {
+          source_references: hmw.source_references,
+          confidence: hmwResponse.hmws.find(h => h.question === hmw.question)?.confidence
+        },
+        selected: false
+      }))
+
+      const pickerChunk: ChatStreamChunk = {
+        type: 'picker',
+        data: {
+          id: pickerId,
+          type: 'hmw_picker',
+          items: pickerItems,
+          actions: ['select', 'confirm', 'cancel'],
+          selectedCount: 0,
+          maxSelections: 5,
+          title: 'Select How Might We Questions',
+          description: 'Choose the questions that resonate most with your challenge'
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+
+      // 8. Persist assistant message
+      await this.persistAssistantMessage(
+        chatId,
+        request.userId,
+        `Generated ${persistedHMWs.length} How Might We questions from ${context.totalItems} context items using ${hmwResponse.meta.generation_method} method`,
+        'generate_hmw',
+        Date.now() - startTime,
+        hmwResponse.hmws.length * 10 // Approximate tokens
+      )
+
+    } catch (error) {
+      // Send error state with reconciliation
+      const errorChunk: ChatStreamChunk = {
+        type: 'context',
+        content: `Failed to generate HMW questions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: {
+          id: contextId,
+          type: 'hmw_error',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`))
+
+      // Persist error message
+      await this.persistAssistantMessage(
+        chatId,
+        request.userId,
+        `Failed to generate HMW questions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'generate_hmw',
+        Date.now() - startTime,
+        50
+      )
+
+      logger.error('HMW generation failed in chat orchestrator', {
+        error: error instanceof Error ? error.message : String(error),
+        chatId,
+        userId: request.userId,
+        requestMessage: request.message
+      })
+    }
   }
 
   /**

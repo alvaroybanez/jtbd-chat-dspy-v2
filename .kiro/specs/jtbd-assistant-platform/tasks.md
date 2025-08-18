@@ -141,7 +141,7 @@
   - Return picker interfaces for user selection
   - _Requirements: 3.5, 3.6, 3.7_
 
-- [ ] 9.3 Integrate HMW generation with chat interface
+- [x] 9.3 Integrate HMW generation with chat interface
   - Call Python DSPy service for HMW generation
   - Handle DSPy failures with fallback generation
   - Present generated HMWs in chat for user selection
@@ -155,34 +155,128 @@
   - Persist solutions with all required relationships
   - _Requirements: 5.1, 5.5, 5.6, 5.7_
 
-- [ ] 10. Implement Python-TypeScript service communication
-- [ ] 10.1 Build TypeScript client for Python intelligence APIs
+- [ ] 10. Build Chat Interface Components
+- [ ] 10.1 Create chat message components with streaming support
+  - Build message components for user and assistant messages
+  - Implement Server-Sent Events for real-time streaming responses
+  - Add typing indicators and loading states
+  - Handle message rendering with markdown support
+  - _Requirements: Real-time chat interface_
+
+- [ ] 10.2 Build document upload interface with drag-and-drop
+  - Create file upload zone with drag-and-drop support
+  - Add file validation for .md/.txt formats and size limits
+  - Implement upload progress indicators
+  - Show upload success/error states
+  - _Requirements: 1.1, 1.3, 1.4_
+
+- [ ] 10.3 Implement context selection picker UI
+  - Build interactive pickers for insights, metrics, and JTBDs
+  - Add search and filtering capabilities
+  - Implement multi-select with visual feedback
+  - Show selected items with removal options
+  - _Requirements: 3.5, 3.6, 3.7_
+
+- [ ] 10.4 Create HMW generation and selection interface
+  - Display generated HMWs with scores and sources
+  - Add selection checkboxes for HMW picking
+  - Show generation progress and loading states
+  - Handle fallback scenarios gracefully
+  - _Requirements: 4.1, 4.4, 4.5_
+
+- [ ] 10.5 Build solution display and prioritization interface
+  - Display solutions sorted by final score
+  - Show impact/effort scores with visual indicators
+  - Add metric assignments and relationships
+  - Implement solution filtering and sorting options
+  - _Requirements: 5.1, 5.5, 5.6_
+
+- [ ] 11. Build Main Application Shell
+- [ ] 11.1 Create responsive layout with navigation
+  - Build responsive app layout with sidebar navigation
+  - Add navigation between chat, uploads, and context management
+  - Implement mobile-responsive design patterns
+  - Add proper accessibility attributes
+  - _Requirements: Responsive web interface_
+
+- [ ] 11.2 Implement chat session management UI
+  - Build chat list with session titles and timestamps
+  - Add new chat creation and session switching
+  - Implement chat archival and deletion
+  - Show chat status and context summaries
+  - _Requirements: 8.1, 8.4_
+
+- [ ] 11.3 Build real-time chat with Server-Sent Events
+  - Connect chat interface to /api/v1/chat endpoint
+  - Handle SSE connection management and reconnection
+  - Implement proper error handling for network issues
+  - Add offline state detection and recovery
+  - _Requirements: 3.1, 3.4, 9.1_
+
+- [ ] 11.4 Add loading states and error handling
+  - Implement comprehensive loading states for all operations
+  - Add error boundaries and graceful error handling
+  - Show user-friendly error messages and recovery options
+  - Add retry mechanisms for failed operations
+  - _Requirements: User experience reliability_
+
+- [ ] 12. Connect Frontend to Backend APIs
+- [ ] 12.1 Integrate document upload with progress indicators
+  - Connect upload UI to POST /api/v1/upload endpoint
+  - Show real-time upload progress and file processing
+  - Handle upload errors and file validation failures
+  - Display successful uploads and trigger insight extraction
+  - _Requirements: 1.1, 1.2, 4.1, 4.3_
+
+- [ ] 12.2 Connect chat interface to streaming API
+  - Integrate chat UI with POST /api/v1/chat SSE endpoint
+  - Handle intent detection routing and responses
+  - Connect context pickers to retrieval endpoints
+  - Implement message persistence and session continuity
+  - _Requirements: 3.1, 8.1, 8.2, 9.1, 9.2_
+
+- [ ] 12.3 Implement context selection persistence
+  - Connect context pickers to backend context APIs
+  - Persist user selections across chat sessions
+  - Handle context updates and notifications
+  - Sync frontend state with backend context storage
+  - _Requirements: 8.3, 8.4_
+
+- [ ] 12.4 Connect HMW/solution generation flows
+  - Integrate HMW interface with generation endpoints
+  - Connect solution display to creation APIs
+  - Handle DSPy service communication and fallbacks
+  - Persist user selections and relationships
+  - _Requirements: 4.1, 5.1, 9.3, 9.4_
+
+- [ ] 13. Implement Python-TypeScript service communication
+- [ ] 13.1 Build TypeScript client for Python intelligence APIs
   - Create HTTP client with timeout handling
   - Implement authentication with x-api-key header
   - Handle connection failures and trigger fallbacks
   - _Requirements: 6.1, 6.2, 9.1, 9.2_
 
-- [ ] 10.2 Add comprehensive error handling and monitoring
+- [ ] 13.2 Add comprehensive error handling and monitoring
   - Implement structured error responses across all endpoints
   - Add timeout detection and fallback activation
   - Create logging for debugging and monitoring
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 11. Build data persistence and relationship management
-- [ ] 11.1 Implement HMW persistence with relationships
+- [ ] 14. Build data persistence and relationship management
+- [ ] 14.1 Implement HMW persistence with relationships
   - Store HMWs with arrays of related JTBD, metric, and insight IDs
   - Maintain relationship integrity during persistence
   - Support efficient relationship queries
-  - _Requirements: 9.3, 10.1, 10.2_
+  - _Requirements: 9.3, 13.1, 13.2_
 
-- [ ] 11.2 Implement solution persistence with metric validation
+- [ ] 14.2 Implement solution persistence with metric validation
   - Store solutions with all required relationship arrays
   - Validate metric_ids array contains at least one ID
   - Ensure fallback metric assignment when needed
-  - _Requirements: 9.4, 10.1, 10.2, 6.4, 6.5_
+  - _Requirements: 9.4, 13.1, 13.2, 6.4, 6.5_
 
-- [ ] 12. Create comprehensive test suite
-- [ ] 12.1 Write unit tests for core utilities
+- [ ] 15. Create comprehensive test suite
+- [ ] 15.1 Write unit tests for core utilities
   - Test intent detection logic with various inputs
   - Test document chunking and embedding generation
   - Test fallback generation when DSPy is unavailable
@@ -190,15 +284,15 @@
   - Test chat persistence and context management
   - _Requirements: All core functionality_
 
-- [ ] 12.2 Write integration tests for service communication
+- [ ] 15.2 Write integration tests for service communication
   - Test TypeScript to Python API communication
   - Test authentication and timeout handling
   - Test fallback activation on service failures
   - Test database operations and constraint validation
   - Test chat session persistence and recovery
-  - _Requirements: 6.1, 6.2, 8.1, 8.2, 9.1, 9.2, 10.1, 10.2_
+  - _Requirements: 6.1, 6.2, 8.1, 8.2, 9.1, 9.2, 13.1, 13.2_
 
-- [ ] 12.3 Write end-to-end workflow tests
+- [ ] 15.3 Write end-to-end workflow tests
   - Test complete document upload to insight generation flow
   - Test chat exploration to context building flow
   - Test HMW generation and selection flow
