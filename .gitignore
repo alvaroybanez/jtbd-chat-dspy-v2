@@ -40,7 +40,10 @@ dist/
 downloads/
 eggs/
 .eggs/
+# Python lib directories (not TypeScript src/lib)
+dspy-service/lib/
 lib/
+!src/lib/
 lib64/
 parts/
 sdist/
