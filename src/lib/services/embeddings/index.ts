@@ -29,8 +29,8 @@ import { BatchProcessor } from './batch'
  * AI SDK V1/V2 compatibility adapter for single embeddings
  * TODO: Remove when AI SDK V2 fully supports embedding models
  */
-function createCompatibleModel(model: any): EmbeddingModel<string> {
-  return model as EmbeddingModel<string>
+function createCompatibleModel(model: EmbeddingModel<string>): EmbeddingModel<string> {
+  return model
 }
 
 /**

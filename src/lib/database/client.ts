@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient, PostgrestError } from '@supabase/supabase-js'
 import { config, isDevelopment } from '../config'
 import { RETRY_CONFIG, TIMEOUTS, DATABASE_LIMITS } from '../config/constants'
 import {
@@ -196,7 +196,7 @@ class DatabaseClient {
    * Execute query with retry logic and timeout
    */
   public async executeQuery<T>(
-    operation: (client: SupabaseClient<Database, 'public'>) => Promise<{ data: T | null; error: any }>,
+    operation: (client: SupabaseClient<Database, 'public'>) => Promise<{ data: T | null; error: PostgrestError | null }>,
     options: RetryOptions = {}
   ): Promise<T> {
     const {
@@ -412,9 +412,18 @@ class DatabaseClient {
   /**
    * Handle Supabase-specific errors
    */
-  private handleSupabaseError(error: any): Error {
-    const message = error.message || error.details || 'Unknown Supabase error'
-    const code = error.code || error.status
+  private handleSupabaseError(error: PostgrestError | unknown): Error {
+    // Type guard to check if error is PostgrestError
+    const isPostgrestError = (err: unknown): err is PostgrestError => {
+      return err !== null && typeof err === 'object' && 'code' in err
+    }
+    
+    const message = isPostgrestError(error) 
+      ? error.message || error.details || 'Unknown Supabase error'
+      : 'Unknown error'
+    const code = isPostgrestError(error) 
+      ? error.code || (error as any).status 
+      : undefined
 
     // Map Supabase error codes to our error types
     switch (code) {
@@ -452,7 +461,7 @@ const databaseClient = DatabaseClient.getInstance()
 export const db = databaseClient
 export const getSupabaseClient = () => databaseClient.getClient()
 export const executeQuery = <T>(
-  operation: (client: SupabaseClient<Database, 'public'>) => Promise<{ data: T | null; error: any }>,
+  operation: (client: SupabaseClient<Database, 'public'>) => Promise<{ data: T | null; error: PostgrestError | null }>,
   options?: RetryOptions
 ) => databaseClient.executeQuery<T>(operation, options)
 export const executeRPC = (functionName: string, parameters?: Record<string, unknown>, options?: RetryOptions) =>

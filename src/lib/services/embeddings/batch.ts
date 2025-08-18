@@ -34,8 +34,8 @@ interface BatchMetrics {
  * TODO: Remove when AI SDK V2 fully supports embedding models
  * Related issue: https://github.com/vercel/ai/issues/embeddings-v2
  */
-function createCompatibleModel(model: any): EmbeddingModel<string> {
-  return model as EmbeddingModel<string>
+function createCompatibleModel(model: EmbeddingModel<string>): EmbeddingModel<string> {
+  return model
 }
 
 /**

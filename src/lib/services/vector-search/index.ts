@@ -16,12 +16,13 @@ import type {
   UnifiedSearchOptions,
   UnifiedSearchResult,
   SearchResult,
-  InsightSearchResult,
-  DocumentSearchResult,
-  JTBDSearchResult,
-  MetricSearchResult,
   VectorSearchService
 } from '../types'
+import type {
+  InsightSearchResult as DbInsightSearchResult,
+  DocumentChunkSearchResult as DbDocumentSearchResult,
+  JTBDSearchResult as DbJTBDSearchResult
+} from '../../database/types'
 import { DEFAULT_SEARCH_OPTIONS } from '../types'
 
 /**
@@ -44,7 +45,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     try {
       const queryEmbedding = await this.getQueryEmbedding(query)
       
-      const results = await db.executeVectorSearch<InsightSearchResult['data'][]>(
+      const results = await db.executeVectorSearch<DbInsightSearchResult[]>(
         'search_insights',
         queryEmbedding,
         mergedOptions.threshold,
@@ -99,7 +100,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     try {
       const queryEmbedding = await this.getQueryEmbedding(query)
       
-      const results = await db.executeVectorSearch<DocumentSearchResult['data'][]>(
+      const results = await db.executeVectorSearch<DbDocumentSearchResult[]>(
         'search_document_chunks',
         queryEmbedding,
         mergedOptions.threshold,
@@ -154,7 +155,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     try {
       const queryEmbedding = await this.getQueryEmbedding(query)
       
-      const results = await db.executeVectorSearch<JTBDSearchResult['data'][]>(
+      const results = await db.executeVectorSearch<DbJTBDSearchResult[]>(
         'search_jtbds',
         queryEmbedding,
         mergedOptions.threshold,
@@ -363,14 +364,14 @@ class VectorSearchServiceImpl implements VectorSearchService {
    * Transform insight search results
    */
   private transformInsightResults(
-    results: InsightSearchResult['data'][],
+    results: DbInsightSearchResult[],
     queryEmbedding: Vector,
     options: VectorSearchOptions
-  ): VectorSearchResult<InsightSearchResult['data']> {
-    const searchResults: SearchResult<InsightSearchResult['data']>[] = results.map(result => ({
+  ): VectorSearchResult<DbInsightSearchResult> {
+    const searchResults: SearchResult<DbInsightSearchResult>[] = results.map(result => ({
       id: result.id,
       content: result.content,
-      similarity: (result as any).similarity ?? 0,
+      similarity: result.similarity,
       metadata: {
         document_id: result.document_id,
         confidence_score: result.confidence_score,
@@ -386,19 +387,17 @@ class VectorSearchServiceImpl implements VectorSearchService {
    * Transform document search results
    */
   private transformDocumentResults(
-    results: DocumentSearchResult['data'][],
+    results: DbDocumentSearchResult[],
     queryEmbedding: Vector,
     options: VectorSearchOptions
-  ): VectorSearchResult<DocumentSearchResult['data']> {
-    const searchResults: SearchResult<DocumentSearchResult['data']>[] = results.map(result => ({
+  ): VectorSearchResult<DbDocumentSearchResult> {
+    const searchResults: SearchResult<DbDocumentSearchResult>[] = results.map(result => ({
       id: result.id,
       content: result.content,
-      similarity: (result as any).similarity ?? 0,
+      similarity: result.similarity,
       metadata: {
         document_id: result.document_id,
-        chunk_index: result.chunk_index,
-        token_count: result.token_count,
-        created_at: result.created_at
+        filename: result.filename
       },
       data: result
     }))
@@ -410,19 +409,17 @@ class VectorSearchServiceImpl implements VectorSearchService {
    * Transform JTBD search results
    */
   private transformJTBDResults(
-    results: JTBDSearchResult['data'][],
+    results: DbJTBDSearchResult[],
     queryEmbedding: Vector,
     options: VectorSearchOptions
-  ): VectorSearchResult<JTBDSearchResult['data']> {
-    const searchResults: SearchResult<JTBDSearchResult['data']>[] = results.map(result => ({
+  ): VectorSearchResult<DbJTBDSearchResult> {
+    const searchResults: SearchResult<DbJTBDSearchResult>[] = results.map(result => ({
       id: result.id,
       content: result.statement,
-      similarity: (result as any).similarity ?? 0,
+      similarity: result.similarity,
       metadata: {
         context: result.context,
-        priority: result.priority,
-        created_at: result.created_at,
-        updated_at: result.updated_at
+        priority: result.priority
       },
       data: result
     }))
