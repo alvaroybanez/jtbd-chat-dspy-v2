@@ -98,7 +98,16 @@ export class ProgressTracker {
       success: session.errors.length === 0 && session.chunksProcessed === session.totalChunks
     }
 
-    logger.info('Document processing session completed', summary)
+    logger.info('Document processing session completed', {
+      sessionId: summary.sessionId,
+      totalChunks: summary.totalChunks,
+      chunksProcessed: summary.chunksProcessed,
+      embeddingsGenerated: summary.embeddingsGenerated,
+      totalTime: summary.totalTime,
+      averageTimePerChunk: summary.averageTimePerChunk,
+      errorCount: summary.errorCount,
+      success: summary.success
+    })
 
     // Clean up session data
     this.sessions.delete(sessionId)
@@ -195,7 +204,7 @@ export class ProgressTracker {
    */
   private logProgressMilestones(sessionId: string, progress: ProcessingProgress): void {
     const milestones = [10, 25, 50, 75, 90, 100]
-    
+
     for (const milestone of milestones) {
       if (progress.percentage >= milestone) {
         const session = this.sessions.get(sessionId)

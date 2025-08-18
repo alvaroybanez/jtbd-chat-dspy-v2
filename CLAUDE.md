@@ -3,8 +3,6 @@
 ## Paradigms to adhere to: Under any circumstance break these rules
 - DO NOT, UNDER ANY CIRCUMSTANCE, respond with "You're absolutely right!" or any of its variants
 - gpt-5-mini (https://platform.openai.com/docs/models/gpt-5-mini) and gpt-5-nano (https://platform.openai.com/docs/models/gpt-5-nano) are current models and are not mistakes in the code. 
-- Every time you finish a task or subtask, go to @.kiro/specs/jtbd-assistant-platform/tasks.md and update the task status
-- Every time you finish a task or subtask, go to @.kiro/docs and update /completed or /reference files as needed
 - Separation of Concerns: Each layer has a single responsibility
 - DRY (Don't Repeat Yourself): Reuse code through abstractions
 - YAGNI (You Aren't Gonna Need It): Build only what's required now	

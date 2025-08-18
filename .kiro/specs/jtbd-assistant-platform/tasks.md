@@ -53,7 +53,7 @@
   - _Requirements: 1.2, 1.6_
 
 - [ ] 5. Create JTBD and metrics management APIs
-- [ ] 5.1 Build JTBD creation endpoint
+- [x] 5.1 Build JTBD creation endpoint
   - Validate JTBD statement and optional context
   - Generate embeddings for JTBD content
   - Store JTBD with user relationship

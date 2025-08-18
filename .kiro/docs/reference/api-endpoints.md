@@ -105,17 +105,30 @@ interface UploadResponse {
 - Insight extraction in `/src/lib/services/insights/extractor.ts`
 - API endpoint in `/src/app/api/v1/upload/route.ts`
 
-### JTBD Management (Planned)
+### JTBD Management
 
 #### POST /api/v1/jtbds
-Create new Jobs-to-be-Done statements.
+Create new Jobs-to-be-Done statements with validation and embedding generation.
 
-**Request**:
+**Status**: ✅ **IMPLEMENTED**
+
+**Request**: 
+- `Content-Type: application/json`
+- Authentication: `x-user-id` header or in request body
+- Fields:
+  - `statement`: string (required, max 500 chars) - The JTBD statement
+  - `context`: string (optional, max 1000 chars) - Additional context
+  - `priority`: number (optional, 1-5 scale) - Priority ranking
+  - `generate_embedding`: boolean (optional, default: true)
+
+**Request Format**:
 ```typescript
 interface CreateJTBDRequest {
   statement: string;
   context?: string;
-  priority?: number; // 1-5 scale
+  priority?: number; // 1-5 scale (1=highest)
+  user_id?: string;  // Can be provided via x-user-id header
+  generate_embedding?: boolean;
 }
 ```
 
@@ -124,9 +137,82 @@ interface CreateJTBDRequest {
 interface CreateJTBDResponse {
   id: string;
   statement: string;
+  context: string | null;
+  priority: number | null;
   embedding_generated: boolean;
+  created_at: string;
 }
 ```
+
+**Example Request**:
+```bash
+curl -X POST http://localhost:3000/api/v1/jtbds \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{
+    "statement": "Help users track their fitness goals consistently",
+    "context": "Users often start fitness routines but struggle to maintain them",
+    "priority": 3
+  }'
+```
+
+**Example Response**:
+```json
+{
+  "id": "987fcdeb-51a2-43d7-b123-456789abcdef",
+  "statement": "Help users track their fitness goals consistently",
+  "context": "Users often start fitness routines but struggle to maintain them",
+  "priority": 3,
+  "embedding_generated": true,
+  "created_at": "2025-01-18T10:30:00Z"
+}
+```
+
+**Error Responses**:
+- `400 BAD_REQUEST`: Invalid statement (empty, too long), priority out of range (1-5), context too long
+- `409 CONFLICT`: Duplicate JTBD statement for user
+- `500 INTERNAL_SERVER_ERROR`: Embedding generation or database errors
+
+#### GET /api/v1/jtbds
+List JTBDs for a user with pagination support.
+
+**Status**: ✅ **IMPLEMENTED**
+
+**Request**:
+- Authentication: `x-user-id` header (required)
+- Query parameters:
+  - `limit`: number (optional, default: 50, max: 100)
+  - `offset`: number (optional, default: 0)
+
+**Response**:
+```typescript
+interface ListJTBDsResponse {
+  jtbds: Array<{
+    id: string;
+    statement: string;
+    context: string | null;
+    priority: number | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
+}
+```
+
+**Example Request**:
+```bash
+curl -X GET "http://localhost:3000/api/v1/jtbds?limit=20&offset=0" \
+  -H "x-user-id: 550e8400-e29b-41d4-a716-446655440000"
+```
+
+**Implementation**:
+- Service layer in `/src/lib/services/jtbd/index.ts`
+- API endpoint in `/src/app/api/v1/jtbds/route.ts`
+- Comprehensive test suite in `/src/lib/services/jtbd/__tests__/index.test.ts`
 
 ### Metrics Management (Planned)
 
@@ -327,6 +413,7 @@ interface ErrorResponse {
 - `FILE_TOO_LARGE` - Upload >1MB → reject with guidance
 - `DATABASE_ERROR` - Supabase connection issues
 - `INVALID_REQUEST` - Malformed request data
+- `DUPLICATE_ENTRY` - Duplicate JTBD statement for user → provide alternative
 
 **Python Service**:
 - `INVALID_API_KEY` - Authentication failed
@@ -460,6 +547,8 @@ const budgetStatus = await tokenBudgetManager.getBudgetStatus(messages, contextI
 - Health check endpoint
 - CORS configuration
 - Error response structure defined
+- **Document upload API** with processing integration
+- **JTBD creation and listing APIs** with validation and embeddings
 
 ### 🚧 In Progress
 - Chat orchestration and streaming response implementation
@@ -467,11 +556,11 @@ const budgetStatus = await tokenBudgetManager.getBudgetStatus(messages, contextI
 - HMW and solution generation endpoints
 
 ### ⏳ Planned
-- Document upload API with processing integration
-- JTBD and metrics management endpoints
-- DSPy intelligence implementations
-- Comprehensive API error handling
-- Fallback generation services
+- **Metrics management endpoint** (POST /api/v1/metrics)
+- **DSPy intelligence implementations** (HMW and solution generation)
+- **Chat orchestration** with streaming responses
+- **Comprehensive API error handling** improvements
+- **Fallback generation services** for DSPy failures
 
 ---
 *API endpoints are designed for the complete JTBD workflow from document upload to solution generation.*
