@@ -4,10 +4,10 @@ Shows how all components work together end-to-end.
 """
 
 import asyncio
-from database import db
-from llm_wrapper import initialize_llm
-from embeddings import initialize_embedding_manager
-from text_utils import get_text_processor
+from app.core.database import db
+from app.core.llm_wrapper import initialize_llm
+from app.core.embeddings import initialize_embedding_manager
+from app.utils.text_utils import get_text_processor
 
 
 def main():

@@ -15,7 +15,8 @@ dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "tiktoken>=0.5.0",
-    "pydantic>=2.0.0"
+    "pydantic>=2.0.0",
+    "watchdog>=6.0.0",
 ]
 
 [project.optional-dependencies]

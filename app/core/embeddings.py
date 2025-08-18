@@ -5,7 +5,7 @@ Handles OpenAI embeddings with caching, batching, and database integration.
 
 from typing import Dict, List, Any, Optional, Tuple
 import hashlib
-from llm_wrapper import LLMWrapper
+from .llm_wrapper import LLMWrapper
 
 # Constants
 EMBEDDING_DIMENSION = 1536

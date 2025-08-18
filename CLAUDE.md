@@ -57,7 +57,7 @@ cp .env.example .env      # Configure SUPABASE_URL, SUPABASE_KEY, OPENAI_API_KEY
 ### Database Operations
 ```bash
 # Test database connection and schema
-uv run python database.py
+uv run python app/core/database.py
 
 # Apply migrations (choose one)
 supabase db reset                    # If using Supabase CLI
@@ -66,7 +66,7 @@ supabase db reset                    # If using Supabase CLI
 
 ### Running the Application
 ```bash
-uv run streamlit run app.py        # Main application (when implemented)
+uv run streamlit run app/main.py   # Main Streamlit application
 ```
 
 ### Code Quality
@@ -75,7 +75,9 @@ uv run black .           # Format code
 uv run isort .           # Sort imports  
 uv run flake8 .          # Lint code
 uv run mypy .            # Type checking
-uv run pytest           # Run tests
+uv run pytest           # Run all tests
+uv run pytest tests/test_embeddings.py -v     # Run specific test file
+uv run pytest -k "test_embedding" -v          # Run tests matching pattern
 ```
 
 ### Dependency Management
@@ -83,6 +85,7 @@ uv run pytest           # Run tests
 uv add package-name              # Runtime dependency
 uv add --group dev package-name  # Development dependency  
 uv add --optional dspy package-name  # Optional dependency group
+uv run scripts/embedding_demo.py    # Demo/test embedding system integration
 ```
 
 ## Database Schema
@@ -99,11 +102,29 @@ All vector columns use 1536-dimension embeddings (OpenAI text-embedding-3-small)
 
 ## Key Implementation Patterns
 
-- **DatabaseManager Class**: Global `db` instance in `database.py` handles all Supabase operations
+- **DatabaseManager Class**: Global `db` instance in `app/core/database.py` handles all Supabase operations
+- **LLMWrapper Class**: Centralized AI interactions with automatic trace logging in `app/core/llm_wrapper.py`
+- **EmbeddingManager Class**: Caching and batch processing for embeddings in `app/core/embeddings.py`
 - **Vector Search**: Use RPC functions with cosine similarity, 0.7 threshold, limit 100 results
 - **Error Handling**: Simple success/error dict patterns, graceful DSPy fallbacks
 - **Embeddings**: Cache-first approach, generate 1536-dim vectors for all searchable content
 - **Solution Scoring**: Final Score = (Impact × 0.6) + ((10 - Effort) × 0.4)
+
+## Module Organization
+
+### Core Components (`app/core/`)
+- **database.py**: DatabaseManager class with Supabase integration, vector search RPC functions
+- **llm_wrapper.py**: LLMWrapper class for OpenAI API calls with automatic trace logging
+- **embeddings.py**: EmbeddingManager class with caching, batching, and database integration
+
+### Utilities (`app/utils/`)
+- **text_utils.py**: TextProcessor class for tokenization, chunking, and text processing
+
+### Application Structure
+- **app/main.py**: Streamlit application entry point
+- **app/services/**: Business logic services (to be implemented)
+- **app/models/**: Data models and schemas (to be implemented)
+- **app/ui/components/**: Reusable UI components (to be implemented)
 
 ## Development Notes
 
@@ -112,4 +133,5 @@ All vector columns use 1536-dimension embeddings (OpenAI text-embedding-3-small)
 - Vector search is the primary content discovery mechanism - text search is secondary
 - DSPy integration is **optional** - OpenAI direct is the fallback for all generation
 - All AI calls should go through a centralized LLM wrapper for trace logging
-- Use the existing `database.py` test functions to verify schema and connections
+- Use the existing `app/core/database.py` test functions to verify schema and connections
+- Environment variables: SUPABASE_URL, SUPABASE_KEY, OPENAI_API_KEY must be configured

@@ -9,9 +9,9 @@ from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict, Any
 
 # Import modules to test
-from llm_wrapper import LLMWrapper, initialize_llm, get_llm
-from embeddings import EmbeddingManager, initialize_embedding_manager
-from text_utils import TextProcessor, get_text_processor, chunk_text, count_tokens
+from app.core.llm_wrapper import LLMWrapper, initialize_llm, get_llm
+from app.core.embeddings import EmbeddingManager, initialize_embedding_manager
+from app.utils.text_utils import TextProcessor, get_text_processor, chunk_text, count_tokens
 
 
 class TestLLMWrapper:
@@ -23,7 +23,7 @@ class TestLLMWrapper:
         self.mock_db.client = Mock()
         self.llm_wrapper = LLMWrapper(self.mock_db)
 
-    @patch("llm_wrapper.OpenAI")
+    @patch("app.core.llm_wrapper.OpenAI")
     def test_initialization_success(self, mock_openai):
         """Test successful LLM wrapper initialization."""
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
@@ -37,7 +37,7 @@ class TestLLMWrapper:
             with pytest.raises(ValueError, match="OPENAI_API_KEY must be set"):
                 LLMWrapper()
 
-    @patch("llm_wrapper.OpenAI")
+    @patch("app.core.llm_wrapper.OpenAI")
     def test_generate_embeddings_single_text(self, mock_openai):
         """Test embedding generation for single text."""
         # Mock OpenAI response
@@ -59,7 +59,7 @@ class TestLLMWrapper:
             assert result["tokens_used"] == 10
             assert "latency_ms" in result
 
-    @patch("llm_wrapper.OpenAI")
+    @patch("app.core.llm_wrapper.OpenAI")
     def test_generate_embeddings_batch(self, mock_openai):
         """Test embedding generation for batch of texts."""
         # Mock OpenAI response
@@ -89,7 +89,7 @@ class TestLLMWrapper:
         assert result["success"] is False
         assert "No texts provided" in result["error"]
 
-    @patch("llm_wrapper.OpenAI")
+    @patch("app.core.llm_wrapper.OpenAI")
     def test_generate_embeddings_api_error(self, mock_openai):
         """Test embedding generation API error handling."""
         mock_client = Mock()
@@ -433,7 +433,7 @@ class TestDatabaseIntegration:
 
     def test_store_document_with_embedding(self):
         """Test storing document with embedding in database."""
-        from database import DatabaseManager
+        from app.core.database import DatabaseManager
 
         db_manager = DatabaseManager.__new__(DatabaseManager)
         db_manager.client = self.mock_client
@@ -448,7 +448,7 @@ class TestDatabaseIntegration:
 
     def test_store_document_chunks(self):
         """Test storing document chunks with embeddings."""
-        from database import DatabaseManager
+        from app.core.database import DatabaseManager
 
         db_manager = DatabaseManager.__new__(DatabaseManager)
         db_manager.client = self.mock_client
@@ -461,7 +461,7 @@ class TestDatabaseIntegration:
 
     def test_search_similar_chunks(self):
         """Test vector similarity search for chunks."""
-        from database import DatabaseManager
+        from app.core.database import DatabaseManager
 
         db_manager = DatabaseManager.__new__(DatabaseManager)
         db_manager.client = self.mock_client

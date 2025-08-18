@@ -1061,6 +1061,7 @@ dependencies = [
     { name = "streamlit" },
     { name = "supabase" },
     { name = "tiktoken" },
+    { name = "watchdog" },
 ]
 
 [package.optional-dependencies]
@@ -1094,6 +1095,7 @@ requires-dist = [
     { name = "streamlit", specifier = ">=1.28.0" },
     { name = "supabase", specifier = ">=2.0.0" },
     { name = "tiktoken", specifier = ">=0.5.0" },
+    { name = "watchdog", specifier = ">=6.0.0" },
 ]
 
 [[package]]
