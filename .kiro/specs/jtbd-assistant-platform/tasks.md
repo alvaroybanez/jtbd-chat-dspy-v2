@@ -105,7 +105,7 @@
   - Add chat archival and cleanup logic
   - _Requirements: Chat state persistence, context tracking_
 
-- [ ] 8.2 Build message persistence pipeline
+- [x] 8.2 Build message persistence pipeline
   - Store messages with role, content, and metadata
   - Track processing time and token usage
   - Record context items used per message

@@ -58,3 +58,13 @@ export {
 } from './session-manager'
 
 export * from './session-types'
+
+// ===== MESSAGE PERSISTENCE PIPELINE =====
+export {
+  MessagePersistencePipeline,
+  messagePersistencePipeline,
+  type UserMessagePersistenceData,
+  type AssistantMessagePersistenceData,
+  type MessagePersistenceResult,
+  type StreamingMessagePersistenceContext
+} from './message-persistence-pipeline'
