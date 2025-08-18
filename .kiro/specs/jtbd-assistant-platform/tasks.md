@@ -59,7 +59,7 @@
   - Store JTBD with user relationship
   - _Requirements: 2.1, 2.3, 2.5_
 
-- [ ] 5.2 Build metrics creation endpoint
+- [x] 5.2 Build metrics creation endpoint
   - Validate metric data (name, values, unit)
   - Store metric with user relationship
   - Make metrics available for chat retrieval

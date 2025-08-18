@@ -214,12 +214,24 @@ curl -X GET "http://localhost:3000/api/v1/jtbds?limit=20&offset=0" \
 - API endpoint in `/src/app/api/v1/jtbds/route.ts`
 - Comprehensive test suite in `/src/lib/services/jtbd/__tests__/index.test.ts`
 
-### Metrics Management (Planned)
+### Metrics Management
 
 #### POST /api/v1/metrics
-Create new metrics for tracking.
+Create new metrics for tracking with validation and storage.
 
-**Request**:
+**Status**: ✅ **IMPLEMENTED**
+
+**Request**: 
+- `Content-Type: application/json`
+- Authentication: `x-user-id` header or in request body
+- Fields:
+  - `name`: string (required, max 100 chars) - The metric name (unique per user)
+  - `unit`: string (required, max 50 chars) - Unit of measurement
+  - `description`: string (optional, max 500 chars) - Metric description
+  - `current_value`: number (optional, decimal(12,2)) - Current metric value
+  - `target_value`: number (optional, decimal(12,2)) - Target metric value
+
+**Request Format**:
 ```typescript
 interface CreateMetricRequest {
   name: string;
@@ -227,6 +239,7 @@ interface CreateMetricRequest {
   current_value?: number;
   target_value?: number;
   unit: string; // e.g., 'percentage', 'dollars', 'count'
+  user_id?: string; // Can be provided via x-user-id header
 }
 ```
 
@@ -235,9 +248,88 @@ interface CreateMetricRequest {
 interface CreateMetricResponse {
   id: string;
   name: string;
+  description: string | null;
+  current_value: number | null;
+  target_value: number | null;
   unit: string;
+  created_at: string;
 }
 ```
+
+**Example Request**:
+```bash
+curl -X POST http://localhost:3000/api/v1/metrics \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{
+    "name": "Customer Satisfaction Score",
+    "description": "Overall customer satisfaction rating",
+    "current_value": 7.2,
+    "target_value": 8.5,
+    "unit": "score"
+  }'
+```
+
+**Example Response**:
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "name": "Customer Satisfaction Score",
+  "description": "Overall customer satisfaction rating",
+  "current_value": 7.2,
+  "target_value": 8.5,
+  "unit": "score",
+  "created_at": "2025-01-18T10:30:00Z"
+}
+```
+
+**Error Responses**:
+- `400 BAD_REQUEST`: Invalid name (empty, too long), unit (empty, too long), description too long, invalid number values
+- `409 CONFLICT`: Duplicate metric name for user
+- `500 INTERNAL_SERVER_ERROR`: Database errors
+
+#### GET /api/v1/metrics
+List metrics for a user with pagination support.
+
+**Status**: ✅ **IMPLEMENTED**
+
+**Request**:
+- Authentication: `x-user-id` header (required)
+- Query parameters:
+  - `limit`: number (optional, default: 50, max: 100)
+  - `offset`: number (optional, default: 0)
+
+**Response**:
+```typescript
+interface ListMetricsResponse {
+  metrics: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    current_value: number | null;
+    target_value: number | null;
+    unit: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
+}
+```
+
+**Example Request**:
+```bash
+curl -X GET "http://localhost:3000/api/v1/metrics?limit=20&offset=0" \
+  -H "x-user-id: 550e8400-e29b-41d4-a716-446655440000"
+```
+
+**Implementation**:
+- Service layer in `/src/lib/services/metrics/index.ts`
+- API endpoint in `/src/app/api/v1/metrics/route.ts`
+- Comprehensive test suite in `/src/lib/services/metrics/__tests__/index.test.ts`
 
 ## Python Intelligence Service (FastAPI)
 
@@ -549,6 +641,7 @@ const budgetStatus = await tokenBudgetManager.getBudgetStatus(messages, contextI
 - Error response structure defined
 - **Document upload API** with processing integration
 - **JTBD creation and listing APIs** with validation and embeddings
+- **Metrics creation and listing APIs** with validation and user scoping
 
 ### 🚧 In Progress
 - Chat orchestration and streaming response implementation
@@ -556,7 +649,6 @@ const budgetStatus = await tokenBudgetManager.getBudgetStatus(messages, contextI
 - HMW and solution generation endpoints
 
 ### ⏳ Planned
-- **Metrics management endpoint** (POST /api/v1/metrics)
 - **DSPy intelligence implementations** (HMW and solution generation)
 - **Chat orchestration** with streaming responses
 - **Comprehensive API error handling** improvements
