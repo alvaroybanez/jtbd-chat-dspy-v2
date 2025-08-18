@@ -14,7 +14,7 @@
   - Seed default metric for fallback scenarios
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 3. Build TypeScript core utilities and services
+- [x] 3. Build TypeScript core utilities and services
 - [x] 3.1 Create configuration and database connection utilities
   - Implement centralized configuration management
   - Set up Supabase client singleton
@@ -33,7 +33,7 @@
   - Build token budget management and truncation utilities
   - _Requirements: 3.1, 3.2, 3.3, 3.9_
 
-- [ ] 4. Implement document upload and processing pipeline
+- [x] 4. Implement document upload and processing pipeline
 - [x] 4.1 Create document upload API endpoint
   - Validate file format (.md, .txt only) and size limits
   - Process text content and generate content hash
@@ -52,7 +52,7 @@
   - Store insights with document relationships
   - _Requirements: 1.2, 1.6_
 
-- [ ] 5. Create JTBD and metrics management APIs
+- [x] 5. Create JTBD and metrics management APIs
 - [x] 5.1 Build JTBD creation endpoint
   - Validate JTBD statement and optional context
   - Generate embeddings for JTBD content
@@ -65,7 +65,7 @@
   - Make metrics available for chat retrieval
   - _Requirements: 2.2, 2.4, 2.5_
 
-- [ ] 6. Implement Python DSPy intelligence services
+- [x] 6. Implement Python DSPy intelligence services
 - [x] 6.1 Set up FastAPI application with authentication
   - Create FastAPI app with x-api-key validation
   - Implement request/response models using Pydantic
@@ -85,7 +85,7 @@
   - Calculate final scores and ensure metric assignment
   - _Requirements: 5.2, 5.3, 5.4, 5.6_
 
-- [ ] 7. Create TypeScript fallback generation services
+- [x] 7. Create TypeScript fallback generation services
 - [x] 7.1 Implement HMW fallback generation
   - Create local HMW generation using OpenAI direct API
   - Ensure "How might we" prefix normalization
@@ -99,7 +99,7 @@
   - _Requirements: 5.7, 6.2, 6.4, 6.5_
 
 - [ ] 8. Implement chat persistence layer
-- [x] 8.1 Create chat session management service
+- [ ] 8.1 Create chat session management service
   - Implement chat creation with initial context
   - Build chat loading with message history
   - Add chat archival and cleanup logic

@@ -44,7 +44,7 @@ src/lib/errors/
 └── chat.ts                            # Chat-specific error classes (158 lines)
 
 .kiro/docs/
-├── task-8.1-plan.md                   # Implementation plan documentation
+├── reference/chat-session-management.md    # Technical reference documentation
 └── completed/
     └── task-8.1-chat-session-management.md  # This completion document
 ```
