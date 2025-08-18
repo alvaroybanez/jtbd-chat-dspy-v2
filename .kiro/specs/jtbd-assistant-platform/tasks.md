@@ -72,7 +72,7 @@
   - Configure DSPy with OpenAI integration
   - _Requirements: 8.1, 8.2, 8.4_
 
-- [ ] 6.2 Build HMW generation endpoint with DSPy
+- [x] 6.2 Build HMW generation endpoint with DSPy
   - Create DSPy signature for HMW generation
   - Implement HMW normalization to ensure "How might we" prefix
   - Generate scored HMWs with source references

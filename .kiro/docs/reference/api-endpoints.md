@@ -361,7 +361,7 @@ Service health and status check.
 #### POST /api/intelligence/generate_hmw
 Generate "How Might We" questions using DSPy.
 
-**Status**: 🚧 Endpoint structure implemented, DSPy logic pending
+**Status**: ✅ Fully implemented with DSPy ChainOfThought
 
 **Current Response**:
 ```json
@@ -649,7 +649,7 @@ const budgetStatus = await tokenBudgetManager.getBudgetStatus(messages, contextI
 - HMW and solution generation endpoints
 
 ### ⏳ Planned
-- **DSPy intelligence implementations** (HMW and solution generation)
+- **DSPy solution generation** (Task 6.3 - HMW generation completed)
 - **Chat orchestration** with streaming responses
 - **Comprehensive API error handling** improvements
 - **Fallback generation services** for DSPy failures
