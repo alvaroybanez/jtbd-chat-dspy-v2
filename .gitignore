@@ -9,3 +9,9 @@ config.toml
 
 # TypeScript
 *.tsbuildinfo
+tsconfig.tsbuildinfo
+tsconfig.tsbuildinfo
+.next/app-build-manifest.json
+.next/build-manifest.json
+.next/trace
+.next/server/app-paths-manifest.json
