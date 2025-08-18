@@ -1,0 +1,652 @@
+/**
+ * Chat Orchestrator Service for JTBD Assistant Platform
+ * Coordinates intent routing, context loading, and response generation
+ */
+
+import { streamText } from 'ai'
+import { openai } from '@ai-sdk/openai'
+import type { LanguageModel } from 'ai'
+import { config } from '../../config'
+import { logger, startPerformance, endPerformance } from '../../logger'
+import { intentDetector, ChatIntent } from './intent-detector'
+import contextRetrievalService from './context-retrieval'
+import { MessagePersistencePipeline } from './message-persistence-pipeline'
+import { ChatSessionManagerImpl } from './session-manager'
+import { tokenBudgetManager } from './token-budget'
+import { 
+  ChatSessionError,
+  ValidationError,
+  ChatNotFoundError
+} from '../../errors'
+import type { UUID } from '../../database/types'
+
+// ===== ORCHESTRATOR TYPES =====
+
+export interface ChatRequest {
+  message: string
+  chatId?: UUID
+  userId: UUID
+  contextItems?: {
+    documentChunks?: UUID[]
+    insights?: UUID[]
+    jtbds?: UUID[]
+    metrics?: UUID[]
+  }
+}
+
+export interface ChatStreamChunk {
+  type: 'message' | 'context' | 'picker' | 'metadata' | 'error' | 'done'
+  content?: string
+  data?: any
+  metadata?: {
+    intent?: string
+    processingTime?: number
+    tokensUsed?: number
+    contextLoaded?: boolean
+  }
+  error?: {
+    code: string
+    message: string
+    action: 'RETRY' | 'NONE'
+    details?: any
+  }
+}
+
+export interface ChatOrchestrationResult {
+  stream: ReadableStream<Uint8Array>
+  chatId: UUID
+  messageId?: UUID
+}
+
+// AI SDK compatibility adapter
+function createCompatibleLanguageModel(model: any): LanguageModel {
+  return model as LanguageModel
+}
+
+/**
+ * Chat Orchestrator Service Implementation
+ */
+export class ChatOrchestrator {
+  private static instance: ChatOrchestrator | null = null
+  private messagePipeline: MessagePersistencePipeline
+  private sessionManager: ChatSessionManagerImpl
+
+  // Singleton pattern
+  public static getInstance(): ChatOrchestrator {
+    if (!ChatOrchestrator.instance) {
+      ChatOrchestrator.instance = new ChatOrchestrator()
+    }
+    return ChatOrchestrator.instance
+  }
+
+  private constructor() {
+    this.messagePipeline = MessagePersistencePipeline.getInstance()
+    this.sessionManager = ChatSessionManagerImpl.getInstance()
+  }
+
+  /**
+   * Process chat request and return streaming response
+   */
+  async processChatRequest(request: ChatRequest): Promise<ChatOrchestrationResult> {
+    const trackingId = startPerformance('chat_orchestration')
+    const startTime = Date.now()
+
+    try {
+      // Validate request
+      this.validateChatRequest(request)
+
+      // Detect intent
+      const intentResult = intentDetector.detectIntent(request.message)
+      
+      logger.info('Chat intent detected', {
+        intent: intentResult.intent,
+        confidence: intentResult.confidence,
+        chatId: request.chatId
+      })
+
+      // Load or create chat session
+      const { chatId, chat } = await this.loadOrCreateChat(request)
+
+      // Persist user message
+      const userMessageResult = await this.messagePipeline.persistUserMessage({
+        chatId,
+        userId: request.userId,
+        content: request.message,
+        contextItems: request.contextItems
+      })
+
+      logger.debug('User message persisted', {
+        messageId: userMessageResult.messageId,
+        chatId
+      })
+
+      // Create streaming response based on intent
+      const stream = await this.createStreamingResponse(
+        intentResult,
+        request,
+        chatId,
+        startTime
+      )
+
+      endPerformance(trackingId, true, {
+        intent: intentResult.intent,
+        chatId,
+        processingTime: Date.now() - startTime
+      })
+
+      return {
+        stream,
+        chatId,
+        messageId: userMessageResult.messageId
+      }
+
+    } catch (error) {
+      endPerformance(trackingId, false, {
+        error: error instanceof Error ? error.message : String(error)
+      })
+
+      // Create error stream
+      const errorStream = this.createErrorStream(error)
+      
+      return {
+        stream: errorStream,
+        chatId: request.chatId || '',
+        messageId: undefined
+      }
+    }
+  }
+
+  /**
+   * Create streaming response based on detected intent
+   */
+  private async createStreamingResponse(
+    intentResult: any,
+    request: ChatRequest,
+    chatId: UUID,
+    startTime: number
+  ): Promise<ReadableStream<Uint8Array>> {
+    const encoder = new TextEncoder()
+    const self = this // Capture 'this' context
+
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          // Send initial metadata
+          const metadataChunk: ChatStreamChunk = {
+            type: 'metadata',
+            metadata: {
+              intent: intentResult.intent,
+              processingTime: Date.now() - startTime,
+              contextLoaded: false
+            }
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(metadataChunk)}\n\n`))
+
+          // Route based on intent
+          switch (intentResult.intent) {
+            case ChatIntent.RETRIEVE_INSIGHTS:
+              await self.handleInsightRetrieval(request, controller, encoder, chatId, startTime)
+              break
+              
+            case ChatIntent.RETRIEVE_METRICS:
+              await self.handleMetricRetrieval(request, controller, encoder, chatId, startTime)
+              break
+              
+            case ChatIntent.RETRIEVE_JTBDS:
+              await self.handleJTBDRetrieval(request, controller, encoder, chatId, startTime)
+              break
+              
+            case ChatIntent.GENERATE_HMW:
+              await self.handleHMWGeneration(request, controller, encoder, chatId, startTime)
+              break
+              
+            case ChatIntent.CREATE_SOLUTIONS:
+              await self.handleSolutionCreation(request, controller, encoder, chatId, startTime)
+              break
+              
+            case ChatIntent.GENERAL_EXPLORATION:
+            default:
+              await self.handleGeneralExploration(request, controller, encoder, chatId, startTime)
+              break
+          }
+
+          // Send completion
+          const doneChunk: ChatStreamChunk = {
+            type: 'done',
+            metadata: {
+              processingTime: Date.now() - startTime
+            }
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(doneChunk)}\n\n`))
+          controller.close()
+
+        } catch (error) {
+          const errorChunk: ChatStreamChunk = {
+            type: 'error',
+            error: {
+              code: 'STREAM_PROCESSING_ERROR',
+              message: error instanceof Error ? error.message : 'Unknown streaming error',
+              action: 'RETRY'
+            }
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`))
+          controller.close()
+        }
+      }
+    })
+  }
+
+  /**
+   * Handle insight retrieval intent
+   */
+  private async handleInsightRetrieval(
+    request: ChatRequest,
+    controller: ReadableStreamDefaultController,
+    encoder: TextEncoder,
+    chatId: UUID,
+    startTime: number
+  ): Promise<void> {
+    const contextResult = await contextRetrievalService.retrieveInsights(request.message, {
+      limit: 20,
+      userId: request.userId
+    })
+
+    // Send context chunk
+    const contextChunk: ChatStreamChunk = {
+      type: 'context',
+      content: `Found ${contextResult.items.length} relevant insights`,
+      data: {
+        type: 'insights_retrieved',
+        results: contextResult.items,
+        summary: contextResult.summary
+      }
+    }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+
+    // Send picker interface
+    const pickerChunk: ChatStreamChunk = {
+      type: 'picker',
+      data: {
+        type: 'insight_picker',
+        items: contextResult.items,
+        pagination: contextResult.pagination
+      }
+    }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+
+    // Persist assistant message
+    await this.persistAssistantMessage(
+      chatId,
+      request.userId,
+      `Found ${contextResult.items.length} relevant insights`,
+      'retrieve_insights',
+      Date.now() - startTime,
+      100
+    )
+  }
+
+  /**
+   * Handle metric retrieval intent
+   */
+  private async handleMetricRetrieval(
+    request: ChatRequest,
+    controller: ReadableStreamDefaultController,
+    encoder: TextEncoder,
+    chatId: UUID,
+    startTime: number
+  ): Promise<void> {
+    const contextResult = await contextRetrievalService.retrieveMetrics(request.message, {
+      limit: 20,
+      userId: request.userId
+    })
+
+    const contextChunk: ChatStreamChunk = {
+      type: 'context',
+      content: `Found ${contextResult.items.length} relevant metrics`,
+      data: {
+        type: 'metrics_retrieved',
+        results: contextResult.items,
+        summary: contextResult.summary
+      }
+    }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+
+    const pickerChunk: ChatStreamChunk = {
+      type: 'picker',
+      data: {
+        type: 'metric_picker',
+        items: contextResult.items,
+        pagination: contextResult.pagination
+      }
+    }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+
+    await this.persistAssistantMessage(
+      chatId,
+      request.userId,
+      `Found ${contextResult.items.length} relevant metrics`,
+      'retrieve_metrics',
+      Date.now() - startTime,
+      100
+    )
+  }
+
+  /**
+   * Handle JTBD retrieval intent
+   */
+  private async handleJTBDRetrieval(
+    request: ChatRequest,
+    controller: ReadableStreamDefaultController,
+    encoder: TextEncoder,
+    chatId: UUID,
+    startTime: number
+  ): Promise<void> {
+    const contextResult = await contextRetrievalService.retrieveJTBDs(request.message, {
+      limit: 20,
+      userId: request.userId
+    })
+
+    const contextChunk: ChatStreamChunk = {
+      type: 'context',
+      content: `Found ${contextResult.items.length} relevant Jobs to be Done`,
+      data: {
+        type: 'jtbds_retrieved',
+        results: contextResult.items,
+        summary: contextResult.summary
+      }
+    }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+
+    const pickerChunk: ChatStreamChunk = {
+      type: 'picker',
+      data: {
+        type: 'jtbd_picker',
+        items: contextResult.items,
+        pagination: contextResult.pagination
+      }
+    }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+
+    await this.persistAssistantMessage(
+      chatId,
+      request.userId,
+      `Found ${contextResult.items.length} relevant Jobs to be Done`,
+      'retrieve_jtbds',
+      Date.now() - startTime,
+      100
+    )
+  }
+
+  /**
+   * Handle HMW generation intent
+   */
+  private async handleHMWGeneration(
+    request: ChatRequest,
+    controller: ReadableStreamDefaultController,
+    encoder: TextEncoder,
+    chatId: UUID,
+    startTime: number
+  ): Promise<void> {
+    // TODO: Implement HMW generation with DSPy service and fallback
+    // For now, send placeholder response
+    const contextChunk: ChatStreamChunk = {
+      type: 'context',
+      content: 'HMW generation will be integrated with DSPy service',
+      data: {
+        type: 'hmw_generation',
+        placeholder: true
+      }
+    }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+
+    await this.persistAssistantMessage(
+      chatId,
+      request.userId,
+      'HMW generation will be integrated with DSPy service',
+      'generate_hmw',
+      Date.now() - startTime,
+      50
+    )
+  }
+
+  /**
+   * Handle solution creation intent
+   */
+  private async handleSolutionCreation(
+    request: ChatRequest,
+    controller: ReadableStreamDefaultController,
+    encoder: TextEncoder,
+    chatId: UUID,
+    startTime: number
+  ): Promise<void> {
+    // TODO: Implement solution creation with DSPy service and fallback
+    // For now, send placeholder response
+    const contextChunk: ChatStreamChunk = {
+      type: 'context',
+      content: 'Solution creation will be integrated with DSPy service',
+      data: {
+        type: 'solution_creation',
+        placeholder: true
+      }
+    }
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+
+    await this.persistAssistantMessage(
+      chatId,
+      request.userId,
+      'Solution creation will be integrated with DSPy service',
+      'create_solutions',
+      Date.now() - startTime,
+      50
+    )
+  }
+
+  /**
+   * Handle general exploration with AI streaming
+   */
+  private async handleGeneralExploration(
+    request: ChatRequest,
+    controller: ReadableStreamDefaultController,
+    encoder: TextEncoder,
+    chatId: UUID,
+    startTime: number
+  ): Promise<void> {
+    try {
+      // Load chat history for context
+      const chatHistory = await this.loadChatHistory(chatId)
+      
+      // Build system prompt
+      const systemPrompt = this.buildSystemPrompt()
+      
+      // Build conversation context
+      const conversationContext = this.buildConversationContext(chatHistory, request.message)
+      
+      // Stream response using AI SDK v5
+      const streamResult = await streamText({
+        model: createCompatibleLanguageModel(openai(config.openai.model)),
+        system: systemPrompt,
+        prompt: conversationContext,
+        temperature: 0.7,
+        maxOutputTokens: 1000
+      })
+
+      let fullContent = ''
+      let tokensUsed = 0
+
+      // Process stream chunks
+      for await (const chunk of streamResult.textStream) {
+        fullContent += chunk
+        
+        const messageChunk: ChatStreamChunk = {
+          type: 'message',
+          content: chunk
+        }
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(messageChunk)}\n\n`))
+      }
+
+      // Calculate tokens used (approximate)
+      tokensUsed = Math.ceil(fullContent.length / 4)
+
+      // Persist complete assistant message
+      await this.persistAssistantMessage(
+        chatId,
+        request.userId,
+        fullContent,
+        'general_exploration',
+        Date.now() - startTime,
+        tokensUsed
+      )
+
+    } catch (error) {
+      logger.error('General exploration streaming failed', error)
+      
+      const errorChunk: ChatStreamChunk = {
+        type: 'error',
+        error: {
+          code: 'STREAM_GENERATION_ERROR',
+          message: 'Failed to generate streaming response',
+          action: 'RETRY'
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`))
+    }
+  }
+
+  /**
+   * Load or create chat session
+   */
+  private async loadOrCreateChat(request: ChatRequest): Promise<{ chatId: UUID, chat: any }> {
+    if (request.chatId) {
+      // Load existing chat
+      const chat = await this.sessionManager.loadChat(request.chatId, request.userId)
+      return { chatId: request.chatId, chat }
+    } else {
+      // Create new chat
+      const chat = await this.sessionManager.createChat(request.userId, 'New Chat')
+      return { chatId: chat.id, chat }
+    }
+  }
+
+  /**
+   * Load chat history for context
+   */
+  private async loadChatHistory(chatId: UUID): Promise<any[]> {
+    try {
+      const chat = await this.sessionManager.loadChat(chatId, 'default-user-id') // TODO: Use proper user ID
+      return chat.messages || []
+    } catch (error) {
+      logger.warn('Could not load chat history', { chatId, error })
+      return []
+    }
+  }
+
+  /**
+   * Build system prompt for general exploration
+   */
+  private buildSystemPrompt(): string {
+    return `You are an AI assistant for the JTBD (Jobs-to-be-Done) Assistant Platform. 
+
+You help users:
+- Analyze customer research and documents
+- Extract insights from uploaded materials
+- Create and manage Jobs-to-be-Done statements
+- Define and track metrics
+- Generate "How Might We" questions
+- Create prioritized solutions
+
+Be concise, helpful, and focused on actionable advice. If users ask about specific features, guide them toward using the appropriate commands or context selection.`
+  }
+
+  /**
+   * Build conversation context from chat history
+   */
+  private buildConversationContext(messages: any[], currentMessage: string): string {
+    let context = ''
+    
+    // Add recent messages for context (limited by token budget)
+    const recentMessages = messages.slice(-5) // Last 5 messages
+    
+    for (const msg of recentMessages) {
+      const role = msg.role === 'user' ? 'User' : 'Assistant'
+      context += `${role}: ${msg.content}\n\n`
+    }
+    
+    context += `User: ${currentMessage}`
+    
+    return context
+  }
+
+  /**
+   * Persist assistant message
+   */
+  private async persistAssistantMessage(
+    chatId: UUID,
+    userId: UUID,
+    content: string,
+    intent: string,
+    processingTimeMs: number,
+    tokensUsed: number
+  ): Promise<void> {
+    try {
+      await this.messagePipeline.persistAssistantMessage({
+        chatId,
+        userId,
+        content,
+        intent,
+        processingTimeMs,
+        tokensUsed,
+        modelUsed: config.openai.model
+      })
+    } catch (error) {
+      logger.error('Failed to persist assistant message', error, {
+        chatId,
+        intent,
+        contentLength: content.length
+      })
+    }
+  }
+
+  /**
+   * Validate chat request
+   */
+  private validateChatRequest(request: ChatRequest): void {
+    if (!request.message?.trim()) {
+      throw new ValidationError('Message cannot be empty')
+    }
+    
+    if (!request.userId) {
+      throw new ValidationError('User ID is required')
+    }
+    
+    if (request.message.length > 4000) {
+      throw new ValidationError('Message too long (max 4000 characters)')
+    }
+  }
+
+  /**
+   * Create error stream for failed requests
+   */
+  private createErrorStream(error: unknown): ReadableStream<Uint8Array> {
+    const encoder = new TextEncoder()
+    
+    return new ReadableStream({
+      start(controller) {
+        const errorChunk: ChatStreamChunk = {
+          type: 'error',
+          error: {
+            code: error instanceof Error ? error.name : 'UNKNOWN_ERROR',
+            message: error instanceof Error ? error.message : 'An unknown error occurred',
+            action: 'RETRY',
+            details: error instanceof Error ? { stack: error.stack } : undefined
+          }
+        }
+        
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`))
+        controller.close()
+      }
+    })
+  }
+}
+
+// Singleton export
+export const chatOrchestrator = ChatOrchestrator.getInstance()

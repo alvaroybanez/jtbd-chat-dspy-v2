@@ -61,8 +61,6 @@ Simple keyword-based detection:
 
 ## Development Commands
 
-Since this is a fresh repository, these commands will be added once the project is initialized:
-
 ### TypeScript Service
 ```bash
 # Install dependencies
@@ -82,21 +80,40 @@ npm run lint
 
 # Testing
 npm test
+npm run test:watch          # Watch mode
+npm run test:coverage       # With coverage report
+
+# Run specific test file or pattern
+npm test -- path/to/test.test.ts
+npm test -- --testNamePattern="specific test name"
 ```
 
-### Python Service
+### Python DSPy Service
 ```bash
+# Navigate to service directory
+cd dspy-service
+
 # Install dependencies
 pip install -r requirements.txt
 
-# Development server
-uvicorn main:app --reload
+# Development server with auto-reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
 
-# Testing
+# Run all tests
 pytest
 
-# Type checking
-mypy .
+# Run specific test file
+pytest tests/test_hmw_generation.py
+pytest tests/test_solution_generation.py
+
+# Run tests with verbose output
+pytest -v
+
+# Validate core DSPy modules
+python validate_core.py
+
+# Test setup and health check
+python test_setup.py
 ```
 
 ## Database Schema
@@ -123,10 +140,16 @@ mypy .
 - `POST /api/v1/upload` - Document upload (.md/.txt only)
 - `POST /api/v1/jtbds` - Create JTBD with embedding
 - `POST /api/v1/metrics` - Create metric
+- `GET/POST /api/v1/chats` - Chat session management
+- `GET/POST/PUT /api/v1/chats/[chatId]` - Individual chat operations
+- `POST /api/v1/chats/[chatId]/messages` - Add messages to chat
+- `GET /api/v1/chats/[chatId]/context` - Get chat context
 
-### Python Intelligence APIs
+### Python Intelligence APIs (DSPy Service)
 - `POST /api/intelligence/generate_hmw` - DSPy HMW generation
 - `POST /api/intelligence/create_solutions` - DSPy solution creation with scoring
+- `GET /health` - Service health check
+- `GET /ready` - Service readiness check
 
 ## Error Handling
 
@@ -176,20 +199,34 @@ When DSPy services fail (timeout/unavailable):
 
 ## Testing Strategy
 
-### Required Test Coverage
-- Intent detection with various inputs
-- Document chunking and embedding generation
-- Vector search accuracy and performance
-- Fallback activation when DSPy unavailable
-- Database constraint validation
-- Complete user workflow end-to-end
-- Service communication and authentication
-- Error handling and timeout scenarios
+### Test Structure
+- **Unit Tests**: `**/__tests__/**/*.test.ts` for TypeScript, `tests/*.py` for Python
+- **Integration Tests**: End-to-end workflow testing with real services
+- **Coverage Thresholds**: Minimum 80% for branches, functions, lines, statements
 
-### Test Data Requirements
-- Seeded default metric for fallback scenarios
-- Sample documents for processing tests
-- Known good embeddings for validation
+### Key Test Areas
+- **Chat System**: Intent detection, session management, message persistence
+- **Context Management**: Token budget, context retrieval, truncation logic
+- **Document Processing**: Chunking, embedding generation, insight extraction
+- **Vector Search**: Similarity search accuracy and performance
+- **Service Integration**: DSPy service communication and fallbacks
+- **Database Operations**: Constraint validation, transaction handling
+- **Error Scenarios**: Timeout handling, service unavailability, invalid input
+
+### Test Commands by Feature
+```bash
+# Chat system tests
+npm test -- src/lib/services/chat/__tests__
+
+# Context management
+npm test -- --testNamePattern="context"
+
+# Database integration
+npm test -- src/lib/database
+
+# Python service tests
+cd dspy-service && pytest tests/
+```
 
 ## Environment Configuration
 
@@ -210,3 +247,31 @@ When DSPy services fail (timeout/unavailable):
 - Truncate older messages first when budget exceeded
 - Preserve selected insights/metrics/JTBDs during truncation
 - Log truncation events for analysis
+
+## Service Architecture Details
+
+### Chat Session Management
+- **SessionManager**: Handles chat lifecycle, persistence, context tracking
+- **MessagePersistencePipeline**: Reliable message storage with audit trail
+- **ContextManager**: Manages selected context items and token budgets
+- **IntentDetector**: Keyword-based intent classification for routing
+
+### Document Processing Pipeline
+1. **File Upload** → Validation (size, type) → Storage
+2. **Text Chunking** → Overlap-based splitting with token counting
+3. **Embedding Generation** → OpenAI text-embedding-3-small
+4. **Insight Extraction** → AI-powered insight generation from chunks
+5. **Vector Storage** → pgvector with ivfflat indexing
+
+### DSPy Integration Pattern
+- **Primary**: DSPy service calls with 30s timeout
+- **Fallback**: Direct OpenAI API calls with simplified prompts
+- **Circuit Breaker**: Automatic fallback activation on service failure
+- **Health Checks**: Regular readiness/liveness monitoring
+
+### File Organization
+- `src/lib/services/` - Core business logic services
+- `src/lib/config/` - Configuration management and constants
+- `src/lib/database/` - Supabase client and database utilities
+- `src/lib/errors/` - Standardized error handling
+- `dspy-service/` - Python FastAPI service with DSPy modules

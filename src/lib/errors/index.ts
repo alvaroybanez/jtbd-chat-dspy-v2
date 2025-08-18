@@ -77,7 +77,6 @@ export {
   SolutionValidationError,
   MetricValidationError,
   FileValidationError,
-  ChatValidationError,
   fromZodError,
   validateRequired,
   validateStringLength,

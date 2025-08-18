@@ -98,7 +98,7 @@
   - Generate solutions with required scoring when DSPy fails
   - _Requirements: 5.7, 6.2, 6.4, 6.5_
 
-- [ ] 8. Implement chat persistence layer
+- [x] 8. Implement chat persistence layer
 - [x] 8.1 Create chat session management service
   - Implement chat creation with initial context
   - Build chat loading with message history
@@ -127,7 +127,7 @@
   - _Requirements: Full chat CRUD operations_
 
 - [ ] 9. Build chat orchestration and streaming API
-- [ ] 9.1 Create main chat endpoint with intent routing
+- [x] 9.1 Create main chat endpoint with intent routing
   - Implement POST /api/v1/chat with Server-Sent Events
   - Route requests based on detected intent
   - Handle general exploration with streaming responses

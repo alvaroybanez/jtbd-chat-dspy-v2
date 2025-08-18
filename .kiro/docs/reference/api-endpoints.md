@@ -11,59 +11,109 @@ Complete API reference for the JTBD Assistant Platform services.
 #### POST /api/v1/chat
 Main chat endpoint for conversational interactions with streaming support.
 
-**Status**: 🚧 Basic structure implemented, full functionality pending
+**Status**: ✅ **FULLY IMPLEMENTED** (Task #9.1 Complete)
 
-**Current Implementation**:
-```typescript
-// src/app/api/v1/chat/route.ts
-export async function POST(request: NextRequest) {
-  return NextResponse.json({ 
-    message: 'Chat endpoint ready for implementation',
-    timestamp: new Date().toISOString()
-  })
-}
-```
+**Features**:
+- Intent-based request routing (6 intent types supported)
+- Server-Sent Events (SSE) streaming responses
+- Context loading and retrieval integration
+- Complete message persistence pipeline
+- Chat session management (create/resume chats)
+- DSPy integration with fallback support
+- Comprehensive error handling
 
-**Planned Request Format**:
+**Request Format**:
 ```typescript
 interface ChatRequest {
   message: string;
   chat_id?: string;           // Optional: continue existing chat
   context_items?: {           // Optional: selected context
-    insight_ids?: string[];
-    metric_ids?: string[];
-    jtbd_ids?: string[];
+    document_chunks?: string[];
+    insights?: string[];
+    jtbds?: string[];
+    metrics?: string[];
   };
-  stream?: boolean;           // Default: true
 }
 ```
 
-**Planned Response Format**:
+**Headers**:
+- `Content-Type: application/json`
+- `x-user-id: string` (required for authentication)
+
+**Response Format**:
 ```typescript
-// Streaming response via Server-Sent Events
+// Server-Sent Events streaming response
+// Content-Type: text/event-stream
 interface ChatChunk {
-  type: 'message' | 'context' | 'picker' | 'error' | 'done';
+  type: 'metadata' | 'message' | 'context' | 'picker' | 'error' | 'done';
   content?: string;
   data?: any;
-  error?: ErrorResponse;
-}
-
-// Error response format
-interface ErrorResponse {
-  code: string;               // UPPER_SNAKE_CASE identifier
-  message: string;            // Human-readable description
-  action: 'RETRY' | 'NONE';   // Suggested user action
-  details?: any;              // Additional context
+  metadata?: {
+    intent?: string;
+    processingTime?: number;
+    tokensUsed?: number;
+    contextLoaded?: boolean;
+  };
+  error?: {
+    code: string;
+    message: string;
+    action: 'RETRY' | 'NONE';
+    details?: any;
+  };
 }
 ```
 
-**Planned Intent Detection**:
+**Response Headers**:
+- `Content-Type: text/event-stream`
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
+- `X-Chat-ID: string` (chat session ID)
+- `X-Message-ID: string` (user message ID)
+
+**Intent Detection**:
 - `insights`/`what did we learn` → retrieve_insights
 - `metrics`/`measure` → retrieve_metrics  
 - `jtbd`/`job to be done` → retrieve_jtbds
 - `hmw`/`how might we` → generate_hmw
 - `solution`/`solve` → create_solutions (with fallback support)
 - Default → general_exploration
+
+**Example Usage**:
+```bash
+# Start new chat with general exploration
+curl -X POST http://localhost:3000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: user-123" \
+  -d '{
+    "message": "What insights do we have about user onboarding?"
+  }' \
+  --no-buffer
+
+# Continue existing chat with context
+curl -X POST http://localhost:3000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: user-123" \
+  -d '{
+    "message": "Generate HMW questions based on these insights",
+    "chat_id": "existing-chat-id",
+    "context_items": {
+      "insights": ["insight-1", "insight-2"],
+      "metrics": ["metric-1"]
+    }
+  }' \
+  --no-buffer
+```
+
+**Example SSE Response**:
+```
+data: {"type":"metadata","metadata":{"intent":"retrieve_insights","processingTime":12,"contextLoaded":false}}
+
+data: {"type":"context","content":"Found 5 relevant insights","data":{"type":"insights_retrieved","results":[...]}}
+
+data: {"type":"picker","data":{"type":"insight_picker","items":[...]}}
+
+data: {"type":"done","metadata":{"processingTime":1247}}
+```
 
 ### Chat History Management
 
