@@ -4,7 +4,7 @@
  * Integrates with Supabase pgvector for high-performance similarity search
  */
 
-import { executeVectorSearch } from '../../database/client'
+import { db } from '../../database/client'
 import { VECTOR_SEARCH, DATABASE_LIMITS } from '../../config/constants'
 import { VectorSearchError } from '../types'
 import { logger, startPerformance, endPerformance } from '../../logger'
@@ -44,7 +44,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     try {
       const queryEmbedding = await this.getQueryEmbedding(query)
       
-      const results = await executeVectorSearch<InsightSearchResult['data'][]>(
+      const results = await db.executeVectorSearch<InsightSearchResult['data'][]>(
         'search_insights',
         queryEmbedding,
         mergedOptions.threshold,
@@ -99,7 +99,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     try {
       const queryEmbedding = await this.getQueryEmbedding(query)
       
-      const results = await executeVectorSearch<DocumentSearchResult['data'][]>(
+      const results = await db.executeVectorSearch<DocumentSearchResult['data'][]>(
         'search_document_chunks',
         queryEmbedding,
         mergedOptions.threshold,
@@ -154,7 +154,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     try {
       const queryEmbedding = await this.getQueryEmbedding(query)
       
-      const results = await executeVectorSearch<JTBDSearchResult['data'][]>(
+      const results = await db.executeVectorSearch<JTBDSearchResult['data'][]>(
         'search_jtbds',
         queryEmbedding,
         mergedOptions.threshold,
@@ -370,7 +370,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     const searchResults: SearchResult<InsightSearchResult['data']>[] = results.map(result => ({
       id: result.id,
       content: result.content,
-      similarity: result.similarity,
+      similarity: (result as any).similarity ?? 0,
       metadata: {
         document_id: result.document_id,
         confidence_score: result.confidence_score,
@@ -393,7 +393,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     const searchResults: SearchResult<DocumentSearchResult['data']>[] = results.map(result => ({
       id: result.id,
       content: result.content,
-      similarity: result.similarity,
+      similarity: (result as any).similarity ?? 0,
       metadata: {
         document_id: result.document_id,
         chunk_index: result.chunk_index,
@@ -417,7 +417,7 @@ class VectorSearchServiceImpl implements VectorSearchService {
     const searchResults: SearchResult<JTBDSearchResult['data']>[] = results.map(result => ({
       id: result.id,
       content: result.statement,
-      similarity: result.similarity,
+      similarity: (result as any).similarity ?? 0,
       metadata: {
         context: result.context,
         priority: result.priority,

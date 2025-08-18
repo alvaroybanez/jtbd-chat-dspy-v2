@@ -5,8 +5,9 @@
 
 import { openai } from '@ai-sdk/openai'
 import { generateText } from 'ai'
-import { logger, startPerformance, endPerformance } from '../../logger'
-import { executeQuery } from '../../database/client'
+import type { LanguageModel } from 'ai'
+import { logger, startPerformance, endPerformance, safeLogData } from '../../logger'
+import { db } from '../../database/client'
 import embeddingService from '../embeddings'
 import type { 
   InsightInsert, 
@@ -35,6 +36,14 @@ export interface InsightExtractionResult {
   totalInsights: number
   processingTime: number
   chunksProcessed: number
+}
+
+/**
+ * AI SDK V1/V2 compatibility adapter for language models
+ * TODO: Remove when AI SDK V2 fully supports language models
+ */
+function createCompatibleLanguageModel(model: any): LanguageModel {
+  return model as LanguageModel
 }
 
 /**
@@ -124,7 +133,7 @@ class InsightExtractionService {
         processingTime: result.processingTime
       })
 
-      logger.info('Insight extraction completed', result)
+      logger.info('Insight extraction completed', safeLogData(result))
 
       return result
 
@@ -199,10 +208,9 @@ Only include insights with confidence >= ${minConfidenceScore}.
 `
 
       const { text } = await generateText({
-        model: openai(OPENAI_MODELS.CHAT_PRIMARY),
+        model: createCompatibleLanguageModel(openai(OPENAI_MODELS.CHAT_PRIMARY)),
         prompt,
-        temperature: OPENAI_MODELS.TEMPERATURE_FACTUAL,
-        maxTokens: OPENAI_MODELS.MAX_TOKENS_GENERATION
+        temperature: OPENAI_MODELS.TEMPERATURE_FACTUAL
       })
 
       // Parse AI response
@@ -463,7 +471,7 @@ Only include insights with confidence >= ${minConfidenceScore}.
       }))
 
       // Insert insights into database
-      await executeQuery<null>(
+      await db.executeQuery<null>(
         async (client) => {
           return await client
             .from('insights')

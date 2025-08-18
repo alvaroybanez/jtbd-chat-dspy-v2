@@ -31,6 +31,16 @@ export class TextChunker implements TextChunkingService {
   }
 
   /**
+   * Helper to ensure metadata is a Record for safe spreading
+   */
+  private ensureMetadata(metadata: unknown): Record<string, unknown> {
+    if (metadata && typeof metadata === 'object' && metadata !== null) {
+      return metadata as Record<string, unknown>
+    }
+    return {}
+  }
+
+  /**
    * Chunk text using specified strategy with smart boundary detection
    */
   async chunkText(text: string, options: ChunkingOptions = {}): Promise<ChunkingResult> {
@@ -228,7 +238,7 @@ export class TextChunker implements TextChunkingService {
         currentChunk = { ...chunk }
       } else if (currentChunk.tokenCount + chunk.tokenCount <= DATABASE_LIMITS.MAX_CHUNK_TOKENS) {
         // Merge with current chunk
-        const mergedContent = currentChunk.content + '\n\n' + chunk.content
+        const mergedContent: string = currentChunk.content + '\n\n' + chunk.content
         const mergedTokenCount = this.tokenCounter.count(mergedContent)
 
         currentChunk = {
@@ -238,9 +248,9 @@ export class TextChunker implements TextChunkingService {
           startIndex: currentChunk.startIndex,
           endIndex: chunk.endIndex,
           metadata: {
-            ...currentChunk.metadata,
+            ...this.ensureMetadata(currentChunk.metadata),
             merged: true,
-            originalChunkCount: (currentChunk.metadata?.originalChunkCount || 1) + 1
+            originalChunkCount: (Number(this.ensureMetadata(currentChunk.metadata).originalChunkCount) || 1) + 1
           }
         }
       } else {

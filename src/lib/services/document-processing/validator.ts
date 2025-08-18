@@ -207,7 +207,7 @@ export class DocumentValidator {
 
     // Validate file extension if present
     const extension = this.extractFileExtension(filename)
-    if (extension && !this.allowedTypes.includes(extension)) {
+    if (extension && !this.isAllowedExtension(extension)) {
       throw new ChunkingError(
         `Unsupported file type: .${extension}`,
         'UNSUPPORTED_FILE_TYPE',
@@ -319,6 +319,13 @@ export class DocumentValidator {
 
     const extension = filename.substring(lastDotIndex + 1).toLowerCase()
     return extension.length > 0 ? extension : null
+  }
+
+  /**
+   * Type guard to check if extension is allowed
+   */
+  private isAllowedExtension(extension: string): extension is typeof FILE_PROCESSING.ALLOWED_EXTENSIONS[number] {
+    return (this.allowedTypes as readonly string[]).includes(extension)
   }
 
   /**

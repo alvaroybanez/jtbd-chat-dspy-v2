@@ -6,6 +6,7 @@
 
 import { openai } from '@ai-sdk/openai'
 import { embed, embedMany } from 'ai'
+import type { EmbeddingModel } from 'ai'
 import { config } from '../../config'
 import { OPENAI_MODELS, RETRY_CONFIG, TIMEOUTS } from '../../config/constants'
 import { EmbeddingError } from '../types'
@@ -23,6 +24,14 @@ import {
 } from '../types'
 import { EmbeddingCache } from './cache'
 import { BatchProcessor } from './batch'
+
+/**
+ * AI SDK V1/V2 compatibility adapter for single embeddings
+ * TODO: Remove when AI SDK V2 fully supports embedding models
+ */
+function createCompatibleModel(model: any): EmbeddingModel<string> {
+  return model as EmbeddingModel<string>
+}
 
 /**
  * OpenAI Embedding Service Implementation
@@ -66,7 +75,7 @@ class OpenAIEmbeddingService implements EmbeddingService {
       // Generate embedding using AI SDK
       const result = await this.retryWithBackoff(async () => {
         return await embed({
-          model: this.model,
+          model: createCompatibleModel(this.model),
           value: text,
         })
       })

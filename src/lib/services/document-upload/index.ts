@@ -4,7 +4,7 @@
  */
 
 import crypto from 'crypto'
-import { logger, startPerformance, endPerformance } from '../../logger'
+import { logger, startPerformance, endPerformance, safeLogData } from '../../logger'
 import { executeQuery } from '../../database/client'
 import documentProcessingService from '../document-processing'
 import insightExtractionService from '../insights/extractor'
@@ -119,7 +119,7 @@ class DocumentUploadService {
         processingTime: result.processingTime
       })
 
-      logger.info('Document upload completed successfully', result)
+      logger.info('Document upload completed successfully', safeLogData(result))
 
       return result
 

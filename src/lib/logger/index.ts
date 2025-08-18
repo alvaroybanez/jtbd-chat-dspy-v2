@@ -448,6 +448,30 @@ export const logApiCall = (method: string, endpoint: string, statusCode: number,
 export const logDatabaseOperation = (operation: string, table: string, duration: number, recordCount?: number, success?: boolean, error?: Error, requestId?: string) =>
   logger.logDatabaseOperation(operation, table, duration, recordCount, success, error, requestId)
 
+/**
+ * Safe logger helper that accepts any object and converts it to Record<string, unknown>
+ * Preserves type safety by being explicit about the conversion
+ */
+export function safeLogData(data: unknown): Record<string, unknown> {
+  if (data === null || data === undefined) {
+    return {}
+  }
+  
+  if (typeof data === 'object' && data !== null) {
+    try {
+      // Ensure it's serializable
+      JSON.stringify(data)
+      return data as Record<string, unknown>
+    } catch {
+      // If not serializable, return string representation
+      return { serialized: String(data) }
+    }
+  }
+  
+  // For primitives, wrap in an object
+  return { value: data }
+}
+
 export const logServiceCall = (service: string, operation: string, duration: number, success?: boolean, statusCode?: number, error?: Error, requestId?: string) =>
   logger.logServiceCall(service, operation, duration, success, statusCode, error, requestId)
 

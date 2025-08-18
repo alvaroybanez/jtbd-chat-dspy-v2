@@ -4,6 +4,9 @@
 
 import type { Vector } from '../database/types'
 
+// Re-export Vector type for use by other service modules
+export type { Vector }
+
 // ===== EMBEDDING TYPES =====
 
 export interface EmbeddingInput {

@@ -451,12 +451,19 @@ const databaseClient = DatabaseClient.getInstance()
 // Main exports for external usage
 export const db = databaseClient
 export const getSupabaseClient = () => databaseClient.getClient()
-export const executeQuery = (operation: any, options?: RetryOptions) => 
-  databaseClient.executeQuery(operation, options)
+export const executeQuery = <T>(
+  operation: (client: SupabaseClient<Database, 'public'>) => Promise<{ data: T | null; error: any }>,
+  options?: RetryOptions
+) => databaseClient.executeQuery<T>(operation, options)
 export const executeRPC = (functionName: string, parameters?: Record<string, unknown>, options?: RetryOptions) =>
   databaseClient.executeRPC(functionName, parameters, options)
-export const executeVectorSearch = (functionName: string, queryEmbedding: Vector, threshold?: number, limit?: number, userId?: string) =>
-  databaseClient.executeVectorSearch(functionName, queryEmbedding, threshold, limit, userId)
+export const executeVectorSearch = <T>(
+  functionName: string, 
+  queryEmbedding: Vector, 
+  threshold?: number, 
+  limit?: number, 
+  userId?: string
+) => databaseClient.executeVectorSearch<T>(functionName, queryEmbedding, threshold, limit, userId)
 
 // Health monitoring exports
 export const getDatabaseHealth = () => databaseClient.getHealth()

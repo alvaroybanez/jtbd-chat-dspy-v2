@@ -5,11 +5,12 @@
  */
 
 import { openai } from '@ai-sdk/openai'
-import { embedMany } from 'ai'
+import { embed } from 'ai'
+import type { EmbeddingModel } from 'ai'
 import { config } from '../../config'
 import { RETRY_CONFIG, TIMEOUTS } from '../../config/constants'
 import { EmbeddingError } from '../types'
-import { logger, startPerformance, endPerformance } from '../../logger'
+import { logger, startPerformance, endPerformance, safeLogData } from '../../logger'
 import type {
   EmbeddingInput,
   EmbeddingResult,
@@ -26,6 +27,15 @@ interface BatchMetrics {
   totalTokens: number
   estimatedCost: number
   processingTime: number
+}
+
+/**
+ * AI SDK V1/V2 compatibility adapter
+ * TODO: Remove when AI SDK V2 fully supports embedding models
+ * Related issue: https://github.com/vercel/ai/issues/embeddings-v2
+ */
+function createCompatibleModel(model: any): EmbeddingModel<string> {
+  return model as EmbeddingModel<string>
 }
 
 /**
@@ -88,7 +98,7 @@ export class BatchProcessor {
         estimatedCost: metrics.estimatedCost
       })
 
-      logger.info('Batch processing completed', metrics)
+      logger.info('Batch processing completed', safeLogData(metrics))
 
       return allResults
 
@@ -191,16 +201,30 @@ export class BatchProcessor {
     try {
       const texts = batch.map(input => input.text)
       
-      // Generate embeddings using AI SDK
-      const result = await this.retryWithBackoff(async () => {
-        return await embedMany({
-          model: this.model,
-          values: texts,
-        })
-      }, options.retries!)
+      // Generate embeddings using AI SDK - process individually due to v1/v2 compatibility
+      const embeddings = []
+      let totalTokens = 0
+      
+      for (const text of texts) {
+        const result = await this.retryWithBackoff(async () => {
+          return await embed({
+            model: createCompatibleModel(this.model),
+            value: text,
+          })
+        }, options.retries!)
+        
+        embeddings.push(result.embedding)
+        totalTokens += result.usage.tokens
+      }
+      
+      // Create a result object that matches the expected format
+      const result = {
+        embeddings,
+        usage: { tokens: totalTokens }
+      }
 
       // Update metrics
-      metrics.apiCalls++
+      metrics.apiCalls += texts.length // One API call per text
       metrics.totalTokens += result.usage.tokens
 
       // Create results and cache embeddings
