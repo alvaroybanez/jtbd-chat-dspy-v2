@@ -65,6 +65,318 @@ interface ErrorResponse {
 - `solution`/`solve` → create_solutions (with fallback support)
 - Default → general_exploration
 
+### Chat History Management
+
+#### GET /api/v1/chats
+List chat sessions with pagination and filtering.
+
+**Status**: ✅ **FULLY IMPLEMENTED**
+
+**Request**:
+- Authentication: `x-user-id` header (required)
+- Query parameters:
+  - `page`: number (optional, default: 1, min: 1)
+  - `pageSize`: number (optional, default: 20, max: 100) 
+  - `status`: enum (optional, default: 'active', values: 'active', 'archived', 'all')
+  - `titleContains`: string (optional) - Filter by title substring
+  - `orderBy`: enum (optional, default: 'updated_at', values: 'created_at', 'updated_at', 'last_message_at')
+  - `order`: enum (optional, default: 'desc', values: 'asc', 'desc')
+
+**Response**:
+```typescript
+interface ChatListResponse {
+  chats: Array<{
+    id: string;
+    title: string;
+    status: 'active' | 'archived' | 'deleted';
+    messageCount: number;
+    totalTokensUsed: number;
+    lastMessageAt: string | null;
+    selectedDocumentIds: string[];
+    selectedInsightIds: string[];
+    selectedJtbdIds: string[];
+    selectedMetricIds: string[];
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
+}
+```
+
+**Example Request**:
+```bash
+curl -X GET "http://localhost:3000/api/v1/chats?page=1&pageSize=10&status=active" \
+  -H "x-user-id: 550e8400-e29b-41d4-a716-446655440000"
+```
+
+#### POST /api/v1/chats
+Create new chat session with optional title and initial context.
+
+**Status**: ✅ **FULLY IMPLEMENTED**
+
+**Request**: 
+- `Content-Type: application/json`
+- Authentication: `x-user-id` header or in request body
+- Fields:
+  - `title`: string (optional, max 100 chars) - Chat title
+  - `initialContext`: object (optional) - Initial context selection
+    - `selectedDocumentIds`: string[] (optional) - Document UUIDs
+    - `selectedInsightIds`: string[] (optional) - Insight UUIDs  
+    - `selectedJtbdIds`: string[] (optional) - JTBD UUIDs
+    - `selectedMetricIds`: string[] (optional) - Metric UUIDs
+
+**Response**:
+```typescript
+interface ChatCreateResponse {
+  id: string;
+  title: string;
+  status: 'active' | 'archived' | 'deleted';
+  messageCount: number;
+  totalTokensUsed: number;
+  selectedDocumentIds: string[];
+  selectedInsightIds: string[];
+  selectedJtbdIds: string[];
+  selectedMetricIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+**Example Request**:
+```bash
+curl -X POST http://localhost:3000/api/v1/chats \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{
+    "title": "Customer Research Analysis",
+    "initialContext": {
+      "selectedInsightIds": ["insight-123", "insight-456"],
+      "selectedMetricIds": ["metric-789"]
+    }
+  }'
+```
+
+#### GET /api/v1/chats/[chatId]
+Retrieve specific chat session with full message history.
+
+**Status**: ✅ **FULLY IMPLEMENTED**
+
+**Request**:
+- Authentication: `x-user-id` header (required)
+- Path parameter: `chatId` (UUID, required)
+
+**Response**:
+```typescript
+interface ChatRetrieveResponse {
+  id: string;
+  title: string;
+  status: 'active' | 'archived' | 'deleted';
+  messageCount: number;
+  totalTokensUsed: number;
+  lastMessageAt: string | null;
+  selectedDocumentIds: string[];
+  selectedInsightIds: string[];
+  selectedJtbdIds: string[];
+  selectedMetricIds: string[];
+  createdAt: string;
+  updatedAt: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    intent?: string;
+    processingTimeMs?: number;
+    tokensUsed?: number;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+```
+
+#### PATCH /api/v1/chats/[chatId]
+Update chat title and/or context selection.
+
+**Status**: ✅ **FULLY IMPLEMENTED**
+
+**Request**: 
+- `Content-Type: application/json`
+- Authentication: `x-user-id` header or in request body
+- Path parameter: `chatId` (UUID, required)
+- Fields (at least one required):
+  - `title`: string (optional, max 100 chars) - New chat title
+  - `context`: object (optional) - Context update
+    - `selectedDocumentIds`: string[] (optional) - Document UUIDs
+    - `selectedInsightIds`: string[] (optional) - Insight UUIDs
+    - `selectedJtbdIds`: string[] (optional) - JTBD UUIDs
+    - `selectedMetricIds`: string[] (optional) - Metric UUIDs
+
+**Response**:
+```typescript
+interface ChatUpdateResponse {
+  id: string;
+  title: string;
+  status: 'active' | 'archived' | 'deleted';
+  messageCount: number;
+  totalTokensUsed: number;
+  selectedDocumentIds: string[];
+  selectedInsightIds: string[];
+  selectedJtbdIds: string[];
+  selectedMetricIds: string[];
+  updatedAt: string;
+  updated: {
+    title: boolean;
+    context: boolean;
+  };
+}
+```
+
+#### DELETE /api/v1/chats/[chatId]
+Archive (soft-delete) chat session.
+
+**Status**: ✅ **FULLY IMPLEMENTED**
+
+**Request**:
+- Authentication: `x-user-id` header (required)
+- Path parameter: `chatId` (UUID, required)
+
+**Response**:
+```typescript
+interface ChatArchiveResponse {
+  id: string;
+  status: 'archived';
+  archivedAt: string;
+}
+```
+
+#### GET /api/v1/chats/[chatId]/messages
+Retrieve messages for a specific chat with pagination and filtering.
+
+**Status**: ✅ **FULLY IMPLEMENTED**
+
+**Request**:
+- Authentication: `x-user-id` header (required)
+- Path parameter: `chatId` (UUID, required)
+- Query parameters:
+  - `limit`: number (optional, default: 50, max: 500)
+  - `offset`: number (optional, default: 0, min: 0)
+  - `orderBy`: enum (optional, default: 'created_at', values: 'created_at', 'updated_at')
+  - `order`: enum (optional, default: 'asc', values: 'asc', 'desc')
+  - `includeContext`: boolean (optional, default: true) - Include context arrays
+  - `role`: enum (optional, filter by role, values: 'user', 'assistant', 'system')
+  - `intent`: string (optional) - Filter by intent
+
+**Response**:
+```typescript
+interface MessagesListResponse {
+  chatId: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    intent?: string;
+    processingTimeMs?: number;
+    tokensUsed?: number;
+    contextDocumentChunks: string[];
+    contextInsights: string[];
+    contextJtbds: string[];
+    contextMetrics: string[];
+    modelUsed?: string;
+    temperature?: number;
+    errorCode?: string;
+    errorMessage?: string;
+    metadata: Record<string, unknown>;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  };
+  metadata: {
+    totalTokensUsed: number;
+    averageProcessingTime?: number;
+    messagesByRole: {
+      user: number;
+      assistant: number;
+      system: number;
+    };
+  };
+}
+```
+
+#### POST /api/v1/chats/[chatId]/context
+Advanced context management with support for add, remove, bulk, and replace operations.
+
+**Status**: ✅ **FULLY IMPLEMENTED**
+
+**Request**: 
+- `Content-Type: application/json`
+- Authentication: `x-user-id` header or in request body
+- Path parameter: `chatId` (UUID, required)
+- Fields:
+  - `operation`: enum (required, values: 'add', 'remove', 'replace', 'bulk')
+  - `itemType`: enum (for add/remove, values: 'document', 'insight', 'jtbd', 'metric')
+  - `itemId`: string (UUID, for add/remove)
+  - `operations`: array (for bulk, array of {type: 'add'|'remove', itemType, itemId})
+  - `context`: object (for replace, complete context replacement)
+  - `metadata`: object (optional) - Operation metadata
+
+**Response**:
+```typescript
+interface ContextUpdateResponse {
+  chatId: string;
+  operation: string;
+  success: boolean;
+  affectedItems: number;
+  newState: {
+    documents: Array<{id: string, type: 'document', title: string, content: string, addedAt: string}>;
+    insights: Array<{id: string, type: 'insight', title: string, content: string, addedAt: string}>;
+    jtbds: Array<{id: string, type: 'jtbd', title: string, content: string, addedAt: string}>;
+    metrics: Array<{id: string, type: 'metric', title: string, content: string, addedAt: string}>;
+    totalItems: number;
+    lastUpdated: string;
+  };
+  warnings?: string[];
+  processingTimeMs: number;
+}
+```
+
+**Example Request (Add Operation)**:
+```bash
+curl -X POST http://localhost:3000/api/v1/chats/123e4567-e89b-12d3-a456-426614174000/context \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{
+    "operation": "add",
+    "itemType": "insight",
+    "itemId": "987fcdeb-51a2-43d7-b123-456789abcdef"
+  }'
+```
+
+**Example Request (Bulk Operation)**:
+```bash
+curl -X POST http://localhost:3000/api/v1/chats/123e4567-e89b-12d3-a456-426614174000/context \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{
+    "operation": "bulk",
+    "operations": [
+      {"type": "add", "itemType": "document", "itemId": "doc-123"},
+      {"type": "add", "itemType": "insight", "itemId": "insight-456"},
+      {"type": "remove", "itemType": "metric", "itemId": "metric-789"}
+    ]
+  }'
+```
+
 ### Document Management
 
 #### POST /api/v1/upload

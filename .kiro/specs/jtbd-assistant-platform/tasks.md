@@ -119,7 +119,7 @@
   - Create context usage tracking
   - _Requirements: Stateful context across sessions_
 
-- [ ] 8.4 Create chat history API endpoints
+- [x] 8.4 Create chat history API endpoints
   - Build chat listing with pagination
   - Implement chat session retrieval
   - Add context update endpoint
