@@ -39,3 +39,22 @@ export {
   getBudgetHealthMetrics,
   formatBudgetStatusForUser
 } from './integration-example'
+
+// ===== CHAT SESSION MANAGEMENT =====
+export {
+  chatSessionManager,
+  ChatSessionManagerImpl,
+  type ChatSessionManager,
+  type ChatContext,
+  type ChatWithMessagesAndContext,
+  type MessageInput,
+  type MessageOptions,
+  type ListChatsOptions,
+  type PaginatedChats,
+  type ChatCreateResult,
+  type ChatLoadResult,
+  CHAT_SESSION_DEFAULTS,
+  CHAT_SESSION_ERROR_CODES
+} from './session-manager'
+
+export * from './session-types'

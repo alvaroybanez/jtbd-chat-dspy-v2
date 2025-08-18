@@ -89,6 +89,26 @@ export {
   isBusinessRuleValidationError,
 } from './validation'
 
+// Chat-specific errors
+export {
+  ChatSessionError,
+  ChatNotFoundError,
+  ChatAccessDeniedError,
+  ChatValidationError,
+  ChatContextError,
+  ChatMessageError,
+  ChatPersistenceError,
+  ChatTitleError,
+  ChatArchivalError,
+  isChatSessionError,
+  isChatNotFoundError,
+  isChatAccessDeniedError,
+  isChatValidationError,
+  isChatPersistenceError,
+  CHAT_ERROR_CODES,
+  type ChatErrorCode,
+} from './chat'
+
 // Error handler and utilities
 export {
   GlobalErrorHandler,
