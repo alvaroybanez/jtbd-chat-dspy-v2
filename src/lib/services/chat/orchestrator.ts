@@ -52,6 +52,45 @@ export interface ChatStreamChunk {
   }
 }
 
+// Enhanced types for AI SDK v5 patterns with reconciliation support
+export interface ContextData {
+  id: string
+  type: 'insights_loading' | 'insights_loaded' | 'metrics_loading' | 'metrics_loaded' | 'jtbds_loading' | 'jtbds_loaded'
+  status: 'loading' | 'loaded' | 'error'
+  message?: string
+  results?: any[]
+  summary?: any
+  error?: string
+}
+
+export interface PickerItem {
+  id: string
+  content: string
+  type: 'insight' | 'metric' | 'jtbd'
+  similarity?: number
+  metadata: Record<string, unknown>
+  displayText: string
+  snippet: string
+  selected: boolean
+}
+
+export interface PickerData {
+  id: string
+  type: 'insight_picker' | 'metric_picker' | 'jtbd_picker'
+  items: PickerItem[]
+  pagination: {
+    page: number
+    pageSize: number
+    totalItems: number
+    totalPages: number
+    hasNext: boolean
+    hasPrevious: boolean
+  }
+  actions: string[]
+  selectedCount: number
+  maxSelections?: number
+}
+
 export interface ChatOrchestrationResult {
   stream: ReadableStream<Uint8Array>
   chatId: UUID
@@ -237,7 +276,7 @@ export class ChatOrchestrator {
   }
 
   /**
-   * Handle insight retrieval intent
+   * Handle insight retrieval intent with progressive loading and reconciliation
    */
   private async handleInsightRetrieval(
     request: ChatRequest,
@@ -246,47 +285,99 @@ export class ChatOrchestrator {
     chatId: UUID,
     startTime: number
   ): Promise<void> {
-    const contextResult = await contextRetrievalService.retrieveInsights(request.message, {
-      limit: 20,
-      userId: request.userId
-    })
+    const contextId = `insights-context-${Date.now()}`
+    const pickerId = `insights-picker-${Date.now()}`
 
-    // Send context chunk
-    const contextChunk: ChatStreamChunk = {
-      type: 'context',
-      content: `Found ${contextResult.items.length} relevant insights`,
-      data: {
-        type: 'insights_retrieved',
-        results: contextResult.items,
-        summary: contextResult.summary
+    try {
+      // 1. Send loading state
+      const loadingChunk: ChatStreamChunk = {
+        type: 'context',
+        content: 'Searching for relevant insights...',
+        data: {
+          id: contextId,
+          type: 'insights_loading',
+          status: 'loading',
+          message: 'Analyzing your query and searching through insights...'
+        } as ContextData
       }
-    }
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadingChunk)}\n\n`))
 
-    // Send picker interface
-    const pickerChunk: ChatStreamChunk = {
-      type: 'picker',
-      data: {
-        type: 'insight_picker',
-        items: contextResult.items,
-        pagination: contextResult.pagination
+      // 2. Retrieve data
+      const contextResult = await contextRetrievalService.retrieveInsights(request.message, {
+        limit: 20,
+        userId: request.userId
+      })
+
+      // 3. Send loaded state with reconciliation (same ID for update)
+      const loadedChunk: ChatStreamChunk = {
+        type: 'context',
+        content: `Found ${contextResult.items.length} relevant insights`,
+        data: {
+          id: contextId, // Same ID for reconciliation
+          type: 'insights_loaded',
+          status: 'loaded',
+          results: contextResult.items,
+          summary: contextResult.summary
+        } as ContextData
       }
-    }
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadedChunk)}\n\n`))
 
-    // Persist assistant message
-    await this.persistAssistantMessage(
-      chatId,
-      request.userId,
-      `Found ${contextResult.items.length} relevant insights`,
-      'retrieve_insights',
-      Date.now() - startTime,
-      100
-    )
+      // 4. Send enhanced picker interface with selection tracking
+      const pickerItems: PickerItem[] = contextResult.items.map(item => ({
+        ...item,
+        selected: false // Initialize selection state
+      }))
+
+      const pickerChunk: ChatStreamChunk = {
+        type: 'picker',
+        data: {
+          id: pickerId,
+          type: 'insight_picker',
+          items: pickerItems,
+          pagination: contextResult.pagination,
+          actions: ['select', 'confirm', 'cancel'],
+          selectedCount: 0,
+          maxSelections: 10 // Allow up to 10 insights to be selected
+        } as PickerData
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+
+      // 5. Persist assistant message
+      await this.persistAssistantMessage(
+        chatId,
+        request.userId,
+        `Found ${contextResult.items.length} relevant insights`,
+        'retrieve_insights',
+        Date.now() - startTime,
+        100
+      )
+
+    } catch (error) {
+      // Send error state with reconciliation
+      const errorChunk: ChatStreamChunk = {
+        type: 'context',
+        content: 'Failed to retrieve insights',
+        data: {
+          id: contextId,
+          type: 'insights_loaded',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        } as ContextData
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`))
+      
+      logger.error('Insight retrieval failed', {
+        error: error instanceof Error ? error.message : String(error),
+        chatId,
+        userId: request.userId
+      })
+      
+      throw error
+    }
   }
 
   /**
-   * Handle metric retrieval intent
+   * Handle metric retrieval intent with progressive loading and reconciliation
    */
   private async handleMetricRetrieval(
     request: ChatRequest,
@@ -295,44 +386,99 @@ export class ChatOrchestrator {
     chatId: UUID,
     startTime: number
   ): Promise<void> {
-    const contextResult = await contextRetrievalService.retrieveMetrics(request.message, {
-      limit: 20,
-      userId: request.userId
-    })
+    const contextId = `metrics-context-${Date.now()}`
+    const pickerId = `metrics-picker-${Date.now()}`
 
-    const contextChunk: ChatStreamChunk = {
-      type: 'context',
-      content: `Found ${contextResult.items.length} relevant metrics`,
-      data: {
-        type: 'metrics_retrieved',
-        results: contextResult.items,
-        summary: contextResult.summary
+    try {
+      // 1. Send loading state
+      const loadingChunk: ChatStreamChunk = {
+        type: 'context',
+        content: 'Searching for relevant metrics...',
+        data: {
+          id: contextId,
+          type: 'metrics_loading',
+          status: 'loading',
+          message: 'Finding metrics that match your query...'
+        } as ContextData
       }
-    }
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadingChunk)}\n\n`))
 
-    const pickerChunk: ChatStreamChunk = {
-      type: 'picker',
-      data: {
-        type: 'metric_picker',
-        items: contextResult.items,
-        pagination: contextResult.pagination
+      // 2. Retrieve data
+      const contextResult = await contextRetrievalService.retrieveMetrics(request.message, {
+        limit: 20,
+        userId: request.userId
+      })
+
+      // 3. Send loaded state with reconciliation
+      const loadedChunk: ChatStreamChunk = {
+        type: 'context',
+        content: `Found ${contextResult.items.length} relevant metrics`,
+        data: {
+          id: contextId, // Same ID for reconciliation
+          type: 'metrics_loaded',
+          status: 'loaded',
+          results: contextResult.items,
+          summary: contextResult.summary
+        } as ContextData
       }
-    }
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadedChunk)}\n\n`))
 
-    await this.persistAssistantMessage(
-      chatId,
-      request.userId,
-      `Found ${contextResult.items.length} relevant metrics`,
-      'retrieve_metrics',
-      Date.now() - startTime,
-      100
-    )
+      // 4. Send enhanced picker interface
+      const pickerItems: PickerItem[] = contextResult.items.map(item => ({
+        ...item,
+        selected: false
+      }))
+
+      const pickerChunk: ChatStreamChunk = {
+        type: 'picker',
+        data: {
+          id: pickerId,
+          type: 'metric_picker',
+          items: pickerItems,
+          pagination: contextResult.pagination,
+          actions: ['select', 'confirm', 'cancel'],
+          selectedCount: 0,
+          maxSelections: 5 // Allow up to 5 metrics to be selected
+        } as PickerData
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+
+      // 5. Persist assistant message
+      await this.persistAssistantMessage(
+        chatId,
+        request.userId,
+        `Found ${contextResult.items.length} relevant metrics`,
+        'retrieve_metrics',
+        Date.now() - startTime,
+        100
+      )
+
+    } catch (error) {
+      // Send error state with reconciliation
+      const errorChunk: ChatStreamChunk = {
+        type: 'context',
+        content: 'Failed to retrieve metrics',
+        data: {
+          id: contextId,
+          type: 'metrics_loaded',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        } as ContextData
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`))
+      
+      logger.error('Metric retrieval failed', {
+        error: error instanceof Error ? error.message : String(error),
+        chatId,
+        userId: request.userId
+      })
+      
+      throw error
+    }
   }
 
   /**
-   * Handle JTBD retrieval intent
+   * Handle JTBD retrieval intent with progressive loading and reconciliation
    */
   private async handleJTBDRetrieval(
     request: ChatRequest,
@@ -341,40 +487,95 @@ export class ChatOrchestrator {
     chatId: UUID,
     startTime: number
   ): Promise<void> {
-    const contextResult = await contextRetrievalService.retrieveJTBDs(request.message, {
-      limit: 20,
-      userId: request.userId
-    })
+    const contextId = `jtbds-context-${Date.now()}`
+    const pickerId = `jtbds-picker-${Date.now()}`
 
-    const contextChunk: ChatStreamChunk = {
-      type: 'context',
-      content: `Found ${contextResult.items.length} relevant Jobs to be Done`,
-      data: {
-        type: 'jtbds_retrieved',
-        results: contextResult.items,
-        summary: contextResult.summary
+    try {
+      // 1. Send loading state
+      const loadingChunk: ChatStreamChunk = {
+        type: 'context',
+        content: 'Searching for relevant Jobs to be Done...',
+        data: {
+          id: contextId,
+          type: 'jtbds_loading',
+          status: 'loading',
+          message: 'Looking through your Jobs to be Done...'
+        } as ContextData
       }
-    }
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadingChunk)}\n\n`))
 
-    const pickerChunk: ChatStreamChunk = {
-      type: 'picker',
-      data: {
-        type: 'jtbd_picker',
-        items: contextResult.items,
-        pagination: contextResult.pagination
+      // 2. Retrieve data
+      const contextResult = await contextRetrievalService.retrieveJTBDs(request.message, {
+        limit: 20,
+        userId: request.userId
+      })
+
+      // 3. Send loaded state with reconciliation
+      const loadedChunk: ChatStreamChunk = {
+        type: 'context',
+        content: `Found ${contextResult.items.length} relevant Jobs to be Done`,
+        data: {
+          id: contextId, // Same ID for reconciliation
+          type: 'jtbds_loaded',
+          status: 'loaded',
+          results: contextResult.items,
+          summary: contextResult.summary
+        } as ContextData
       }
-    }
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadedChunk)}\n\n`))
 
-    await this.persistAssistantMessage(
-      chatId,
-      request.userId,
-      `Found ${contextResult.items.length} relevant Jobs to be Done`,
-      'retrieve_jtbds',
-      Date.now() - startTime,
-      100
-    )
+      // 4. Send enhanced picker interface
+      const pickerItems: PickerItem[] = contextResult.items.map(item => ({
+        ...item,
+        selected: false
+      }))
+
+      const pickerChunk: ChatStreamChunk = {
+        type: 'picker',
+        data: {
+          id: pickerId,
+          type: 'jtbd_picker',
+          items: pickerItems,
+          pagination: contextResult.pagination,
+          actions: ['select', 'confirm', 'cancel'],
+          selectedCount: 0,
+          maxSelections: 8 // Allow up to 8 JTBDs to be selected
+        } as PickerData
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+
+      // 5. Persist assistant message
+      await this.persistAssistantMessage(
+        chatId,
+        request.userId,
+        `Found ${contextResult.items.length} relevant Jobs to be Done`,
+        'retrieve_jtbds',
+        Date.now() - startTime,
+        100
+      )
+
+    } catch (error) {
+      // Send error state with reconciliation
+      const errorChunk: ChatStreamChunk = {
+        type: 'context',
+        content: 'Failed to retrieve Jobs to be Done',
+        data: {
+          id: contextId,
+          type: 'jtbds_loaded',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        } as ContextData
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`))
+      
+      logger.error('JTBD retrieval failed', {
+        error: error instanceof Error ? error.message : String(error),
+        chatId,
+        userId: request.userId
+      })
+      
+      throw error
+    }
   }
 
   /**

@@ -134,7 +134,7 @@
   - Integrate with chat persistence for message storage
   - _Requirements: 3.1, 3.4, 8.1, 8.2_
 
-- [ ] 9.2 Implement context retrieval and picker responses
+- [x] 9.2 Implement context retrieval and picker responses
   - Build insights retrieval and presentation in chat
   - Build metrics retrieval and presentation in chat
   - Build JTBDs retrieval and presentation in chat
