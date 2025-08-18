@@ -5,6 +5,7 @@
 
 import { openai } from '@ai-sdk/openai'
 import { generateText } from 'ai'
+import type { LanguageModel } from 'ai'
 import { config } from '../../config'
 import { logger, startPerformance, endPerformance } from '../../logger'
 import type {
@@ -14,6 +15,15 @@ import type {
   FallbackHMWResult
 } from './types'
 import { FallbackGenerationError } from './types'
+
+/**
+ * AI SDK V1/V2 compatibility adapter for language models
+ * TODO: Remove when AI SDK V2 fully supports language models
+ */
+function createCompatibleLanguageModel(model: any): LanguageModel {
+  return model as LanguageModel
+}
+
 
 export class HMWFallbackService {
   constructor() { }
@@ -39,11 +49,11 @@ export class HMWFallbackService {
 
       // Generate HMWs using AI SDK
       const result = await generateText({
-        model: openai(config.openai.model),
+        model: createCompatibleLanguageModel(openai(config.openai.model)),
         system: this.buildSystemPrompt(),
         prompt: this.buildUserPrompt(context, count),
         temperature,
-        maxTokens: 1000,
+        maxOutputTokens: 1000,
         maxRetries: 2
       })
 

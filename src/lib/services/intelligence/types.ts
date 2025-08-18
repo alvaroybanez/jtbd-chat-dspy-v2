@@ -69,6 +69,48 @@ export interface GenerateHMWResponse {
   total_hmws: number
 }
 
+// ===== SOLUTION-RELATED REQUEST TYPES =====
+
+export interface HMWItem {
+  id: string
+  question: string
+  score?: number
+}
+
+export interface SolutionContext {
+  insights: ContextItem[]
+  metrics: MetricItem[]
+  jtbds: JTBDItem[]
+  hmws: HMWItem[]
+}
+
+export interface CreateSolutionsRequest {
+  hmws: HMWItem[]
+  context: SolutionContext
+  count?: number
+  temperature?: number
+}
+
+// ===== SOLUTION-RELATED RESPONSE TYPES =====
+
+export interface SolutionResult {
+  title: string
+  description: string
+  impact_score: number
+  effort_score: number
+  final_score: number
+  assigned_metrics: string[]
+  source_references: SourceReferences
+  confidence?: number
+}
+
+export interface CreateSolutionsResponse {
+  solutions: SolutionResult[]
+  meta: MetaInfo
+  total_solutions: number
+  fallback_metric_used?: boolean
+}
+
 // ===== ERROR TYPES =====
 
 export class IntelligenceServiceError extends Error {
@@ -104,6 +146,17 @@ export class FallbackGenerationError extends IntelligenceServiceError {
   }
 }
 
+export class SolutionGenerationError extends IntelligenceServiceError {
+  constructor(
+    message: string,
+    code: string = 'SOLUTION_GENERATION_ERROR',
+    originalError?: unknown
+  ) {
+    super(message, code, originalError)
+    this.name = 'SolutionGenerationError'
+  }
+}
+
 // ===== INTERNAL TYPES =====
 
 export interface HMWGenerationOptions {
@@ -116,6 +169,22 @@ export interface HMWGenerationOptions {
 export interface FallbackHMWResult {
   question: string
   score: number
+  reasoning: string
+}
+
+export interface SolutionGenerationOptions {
+  count: number
+  temperature: number
+  maxRetries: number
+  timeout: number
+}
+
+export interface FallbackSolutionResult {
+  title: string
+  description: string
+  impact_score: number
+  effort_score: number
+  assigned_metrics: string[]
   reasoning: string
 }
 
@@ -150,6 +219,28 @@ export const HMWContextSchema = z.object({
 
 export const GenerateHMWRequestSchema = z.object({
   context: HMWContextSchema,
+  count: z.number().int().min(1).max(20).default(5),
+  temperature: z.number().min(0).max(2).default(0.7)
+})
+
+// ===== SOLUTION-RELATED VALIDATION SCHEMAS =====
+
+export const HMWItemSchema = z.object({
+  id: z.string().min(1),
+  question: z.string().min(15),
+  score: z.number().min(0).max(10).optional()
+})
+
+export const SolutionContextSchema = z.object({
+  insights: z.array(ContextItemSchema).default([]),
+  metrics: z.array(MetricItemSchema).min(1, 'At least one metric is required for solution generation'),
+  jtbds: z.array(JTBDItemSchema).default([]),
+  hmws: z.array(HMWItemSchema).min(1, 'At least one HMW question is required for solution generation')
+})
+
+export const CreateSolutionsRequestSchema = z.object({
+  hmws: z.array(HMWItemSchema).min(1).max(20),
+  context: SolutionContextSchema,
   count: z.number().int().min(1).max(20).default(5),
   temperature: z.number().min(0).max(2).default(0.7)
 })

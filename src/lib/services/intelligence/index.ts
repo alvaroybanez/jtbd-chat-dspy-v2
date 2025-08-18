@@ -1,6 +1,6 @@
 /**
  * Intelligence Service Module
- * Exports for HMW generation with DSPy and fallback capabilities
+ * Exports for HMW generation and solution creation with DSPy and fallback capabilities
  */
 
 // ===== MAIN SERVICE EXPORTS =====
@@ -9,6 +9,12 @@ export {
   HMWGenerationService,
   type HMWGenerationOptions
 } from './hmw-service'
+
+export {
+  solutionService,
+  SolutionGenerationService,
+  type SolutionGenerationServiceOptions
+} from './solution-service'
 
 // ===== DSPY CLIENT EXPORTS =====
 export {
@@ -23,13 +29,27 @@ export {
   HMWFallbackService
 } from './hmw-fallback'
 
+export {
+  solutionFallbackService,
+  SolutionFallbackService
+} from './solution-fallback'
+
 // ===== TYPE EXPORTS =====
 export type {
-  // Request/Response types
+  // HMW Request/Response types
   HMWContext,
   GenerateHMWRequest,
   GenerateHMWResponse,
   HMWResult,
+  
+  // Solution Request/Response types
+  HMWItem,
+  SolutionContext,
+  CreateSolutionsRequest,
+  CreateSolutionsResponse,
+  SolutionResult,
+  
+  // Shared types
   SourceReferences,
   MetaInfo,
   
@@ -40,19 +60,30 @@ export type {
   
   // Internal types
   HMWGenerationOptions as InternalHMWOptions,
+  SolutionGenerationOptions,
   FallbackHMWResult,
+  FallbackSolutionResult,
   
   // Error types
   IntelligenceServiceError,
   DSPyServiceError,
-  FallbackGenerationError
+  FallbackGenerationError,
+  SolutionGenerationError
 } from './types'
 
 // ===== VALIDATION SCHEMA EXPORTS =====
 export {
+  // Base schemas
   ContextItemSchema,
   MetricItemSchema,
   JTBDItemSchema,
+  
+  // HMW schemas
   HMWContextSchema,
-  GenerateHMWRequestSchema
+  GenerateHMWRequestSchema,
+  
+  // Solution schemas
+  HMWItemSchema,
+  SolutionContextSchema,
+  CreateSolutionsRequestSchema
 } from './types'

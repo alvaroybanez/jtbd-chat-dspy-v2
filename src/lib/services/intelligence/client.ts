@@ -7,7 +7,9 @@ import { config } from '../../config'
 import { logger, startPerformance, endPerformance } from '../../logger'
 import type {
   GenerateHMWRequest,
-  GenerateHMWResponse
+  GenerateHMWResponse,
+  CreateSolutionsRequest,
+  CreateSolutionsResponse
 } from './types'
 import { DSPyServiceError } from './types'
 
@@ -83,6 +85,58 @@ export class DSPyIntelligenceClient {
       throw new DSPyServiceError(
         'Failed to generate HMW questions via DSPy service',
         'DSPY_GENERATION_FAILED',
+        error
+      )
+    }
+  }
+
+  /**
+   * Create solutions using DSPy service
+   */
+  async createSolutions(request: CreateSolutionsRequest): Promise<CreateSolutionsResponse> {
+    const trackingId = startPerformance('dspy_solution_creation')
+
+    try {
+      const response = await this.makeRequest<CreateSolutionsResponse>(
+        'POST',
+        '/api/intelligence/create_solutions',
+        request
+      )
+
+      endPerformance(trackingId, true, {
+        solutionCount: response.solutions.length,
+        requestedCount: request.count || 5,
+        generationMethod: response.meta.generation_method,
+        fallbackMetricUsed: response.fallback_metric_used
+      })
+
+      logger.info('DSPy solution creation successful', {
+        solutionCount: response.solutions.length,
+        requestedCount: request.count || 5,
+        duration: response.meta.duration_ms,
+        retries: response.meta.retries,
+        fallbackMetricUsed: response.fallback_metric_used
+      })
+
+      return response
+
+    } catch (error) {
+      endPerformance(trackingId, false, {
+        error: error instanceof Error ? error.message : String(error)
+      })
+
+      logger.error('DSPy solution creation failed', {
+        serviceUrl: this.options.serviceUrl,
+        error: error instanceof Error ? error.message : String(error)
+      })
+
+      if (error instanceof DSPyServiceError) {
+        throw error
+      }
+
+      throw new DSPyServiceError(
+        'Failed to create solutions via DSPy service',
+        'DSPY_SOLUTION_CREATION_FAILED',
         error
       )
     }

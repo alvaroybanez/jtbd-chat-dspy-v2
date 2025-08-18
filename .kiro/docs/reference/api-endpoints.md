@@ -62,7 +62,7 @@ interface ErrorResponse {
 - `metrics`/`measure` → retrieve_metrics  
 - `jtbd`/`job to be done` → retrieve_jtbds
 - `hmw`/`how might we` → generate_hmw
-- `solution`/`solve` → create_solutions
+- `solution`/`solve` → create_solutions (with fallback support)
 - Default → general_exploration
 
 ### Document Management
@@ -407,7 +407,7 @@ interface GenerateHMWResponse {
 #### POST /api/intelligence/create_solutions
 Generate prioritized solutions using DSPy with intelligent metric assignment.
 
-**Status**: ✅ **FULLY IMPLEMENTED** with DSPy ChainOfThought
+**Status**: ✅ **FULLY IMPLEMENTED** with DSPy ChainOfThought + TypeScript Fallback Support
 
 **Request**:
 ```typescript
@@ -457,7 +457,8 @@ interface CreateSolutionsResponse {
 - **Intelligent metric assignment**: Relevance-based algorithm assigns optimal metrics to solutions
 - **Impact/effort scoring**: Solutions scored 1-10 for both impact and effort with automatic final score calculation
 - **Solution prioritization**: Results sorted by final score (impact/effort ratio) for maximum ROI
-- **Fallback generation**: Context-aware fallback when DSPy services unavailable
+- **TypeScript fallback generation**: AI SDK v5 fallback when DSPy services unavailable (Task 7.2)
+- **Service resilience**: 30-second timeout with automatic fallback activation
 - **Source tracking**: Complete relationship tracking for insights, metrics, JTBDs, and HMWs
 
 **Example Request**:
@@ -533,7 +534,7 @@ interface CreateSolutionsResponse {
 - **Authentication**: x-api-key header
 - **Timeout**: 30 seconds with automatic fallback
 - **Retry Logic**: Single retry on connection failure
-- **Fallback**: Direct OpenAI API calls when DSPy unavailable
+- **Fallback**: AI SDK v5 direct API calls when DSPy unavailable (Tasks 7.1, 7.2)
 
 **Example Client Code**:
 ```typescript

@@ -101,7 +101,7 @@ describe('HMWFallbackService', () => {
         system: expect.stringContaining('You are an expert product strategist'),
         prompt: expect.stringContaining('INSIGHTS:'),
         temperature: 0.7,
-        maxTokens: 1000,
+        maxOutputTokens: 1000,
         maxRetries: 2
       })
 
