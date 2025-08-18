@@ -15,6 +15,7 @@ import { ChatSessionManagerImpl } from './session-manager'
 import { tokenBudgetManager } from './token-budget'
 import { contextManager } from './context-manager'
 import { hmwService } from '../intelligence/hmw-service'
+import { solutionService } from '../intelligence/solution-service'
 import { executeQuery } from '../../database/client'
 import { 
   ChatSessionError,
@@ -22,7 +23,7 @@ import {
   ChatNotFoundError
 } from '../../errors'
 import type { UUID, HMWInsert } from '../../database/types'
-import type { HMWContext, HMWResult, SourceReferences } from '../intelligence/types'
+import type { HMWContext, HMWResult, SourceReferences, SolutionContext, SolutionResult, HMWItem } from '../intelligence/types'
 
 // ===== ORCHESTRATOR TYPES =====
 
@@ -41,7 +42,30 @@ export interface ChatRequest {
 export interface ChatStreamChunk {
   type: 'message' | 'context' | 'picker' | 'metadata' | 'error' | 'done'
   content?: string
-  data?: any
+  data?: {
+    id?: string
+    type?: string
+    status?: 'loading' | 'loaded' | 'error'
+    message?: string
+    results?: unknown[]
+    generation_method?: string
+    context_summary?: Record<string, number>
+    items?: Array<{
+      id: string
+      type: string
+      title: string
+      content: string
+      score?: number
+      metadata?: Record<string, unknown>
+      selected: boolean
+    }>
+    actions?: string[]
+    selectedCount?: number
+    maxSelections?: number
+    title?: string
+    description?: string
+    error?: string
+  }
   metadata?: {
     intent?: string
     processingTime?: number
@@ -52,7 +76,7 @@ export interface ChatStreamChunk {
     code: string
     message: string
     action: 'RETRY' | 'NONE'
-    details?: any
+    details?: Record<string, unknown>
   }
 }
 
@@ -62,8 +86,14 @@ export interface ContextData {
   type: 'insights_loading' | 'insights_loaded' | 'metrics_loading' | 'metrics_loaded' | 'jtbds_loading' | 'jtbds_loaded'
   status: 'loading' | 'loaded' | 'error'
   message?: string
-  results?: any[]
-  summary?: any
+  results?: Array<{
+    id: string
+    title?: string
+    description?: string
+    score?: number
+    metadata?: Record<string, unknown>
+  }>
+  summary?: Record<string, string | number | boolean>
   error?: string
 }
 
@@ -102,7 +132,7 @@ export interface ChatOrchestrationResult {
 }
 
 // AI SDK compatibility adapter
-function createCompatibleLanguageModel(model: any): LanguageModel {
+function createCompatibleLanguageModel(model: unknown): LanguageModel {
   return model as LanguageModel
 }
 
@@ -203,7 +233,7 @@ export class ChatOrchestrator {
    * Create streaming response based on detected intent
    */
   private async createStreamingResponse(
-    intentResult: any,
+    intentResult: { type: string; confidence?: number },
     request: ChatRequest,
     chatId: UUID,
     startTime: number
@@ -821,26 +851,252 @@ export class ChatOrchestrator {
     chatId: UUID,
     startTime: number
   ): Promise<void> {
-    // TODO: Implement solution creation with DSPy service and fallback
-    // For now, send placeholder response
-    const contextChunk: ChatStreamChunk = {
-      type: 'context',
-      content: 'Solution creation will be integrated with DSPy service',
-      data: {
-        type: 'solution_creation',
-        placeholder: true
-      }
-    }
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(contextChunk)}\n\n`))
+    const contextId = `ctx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const pickerId = `picker_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    await this.persistAssistantMessage(
-      chatId,
-      request.userId,
-      'Solution creation will be integrated with DSPy service',
-      'create_solutions',
-      Date.now() - startTime,
-      50
-    )
+    try {
+      // 1. Send loading state
+      const loadingChunk: ChatStreamChunk = {
+        type: 'context',
+        content: 'Creating solutions from selected HMW questions and context...',
+        data: {
+          id: contextId,
+          type: 'solution_loading',
+          status: 'loading',
+          message: 'Building context and generating prioritized solutions...'
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadingChunk)}\n\n`))
+
+      // 2. Load context for solution creation
+      const contextResult = await contextManager.loadContextWithData(chatId, request.userId)
+      const { context } = contextResult
+
+      // 3. Validate HMW selection
+      if (context.hmws.length === 0) {
+        throw new ValidationError(
+          'No HMW questions selected. Please generate and select How Might We questions first.',
+          'NO_HMWS_SELECTED'
+        )
+      }
+
+      if (context.metrics.length === 0) {
+        throw new ValidationError(
+          'No metrics selected. Please select at least one metric to create solutions.',
+          'NO_METRICS_SELECTED'
+        )
+      }
+
+      // 4. Get properly typed context data from database
+      const hmwsData = await executeQuery<Array<{id: UUID, question: string, score?: number}>>(async (client) =>
+        client
+          .from('hmws')
+          .select('id, question, score')
+          .in('id', context.hmws.map(h => h.id))
+          .eq('user_id', request.userId)
+      ) || []
+
+      const insightsData = context.insights.length > 0 
+        ? await executeQuery<Array<{id: UUID, content: string}>>(async (client) =>
+            client
+              .from('insights')
+              .select('id, content')
+              .in('id', context.insights.map(i => i.id))
+              .eq('user_id', request.userId)
+          ) || []
+        : []
+      
+      const metricsData = await executeQuery<Array<{id: UUID, name: string, description: string | null, current_value: number | null, target_value: number | null, unit: string}>>(async (client) =>
+        client
+          .from('metrics')
+          .select('id, name, description, current_value, target_value, unit')
+          .in('id', context.metrics.map(m => m.id))
+          .eq('user_id', request.userId)
+      ) || []
+        
+      const jtbdsData = context.jtbds.length > 0
+        ? await executeQuery<Array<{id: UUID, statement: string, context: string | null, priority: number | null}>>(async (client) =>
+            client
+              .from('jtbds')
+              .select('id, statement, context, priority')
+              .in('id', context.jtbds.map(j => j.id))
+              .eq('user_id', request.userId)
+          ) || []
+        : []
+
+      // 5. Build solution context and HMW items
+      const hmwItems: HMWItem[] = hmwsData.map(hmw => ({
+        id: hmw.id,
+        question: hmw.question,
+        score: hmw.score
+      }))
+
+      const solutionContext: SolutionContext = {
+        insights: insightsData.map(item => ({
+          id: item.id,
+          content: item.content
+        })),
+        metrics: metricsData.map(item => ({
+          id: item.id,
+          name: item.name,
+          description: item.description || undefined,
+          current_value: item.current_value || undefined,
+          target_value: item.target_value || undefined,
+          unit: item.unit
+        })),
+        jtbds: jtbdsData.map(item => ({
+          id: item.id,
+          statement: item.statement,
+          context: item.context || undefined,
+          priority: item.priority || undefined
+        })),
+        hmws: hmwItems
+      }
+
+      // 6. Generate solutions using service
+      const solutionResponse = await solutionService.createSolutions(hmwItems, solutionContext, {
+        count: 5,
+        temperature: 0.7
+      })
+
+      // 7. Persist solutions to database
+      const persistedSolutions: Array<{ id: UUID; title: string; description: string; impact_score: number; effort_score: number; final_score: number; assigned_metrics: string[] }> = []
+
+      for (const solution of solutionResponse.solutions) {
+        const solutionData = {
+          user_id: request.userId,
+          title: solution.title,
+          description: solution.description,
+          impact_score: solution.impact_score,
+          effort_score: solution.effort_score,
+          final_score: solution.final_score || (solution.impact_score / solution.effort_score),
+          metric_ids: solution.assigned_metrics,
+          hmw_ids: hmwItems.map(h => h.id),
+          jtbd_ids: solutionContext.jtbds.map(j => j.id),
+          insight_ids: solutionContext.insights.map(i => i.id),
+          generation_method: solutionResponse.meta.generation_method
+        }
+
+        try {
+          const insertedSolution = await executeQuery<{id: UUID, title: string, description: string, impact_score: number, effort_score: number, final_score: number, metric_ids: string[]}>(async (client) =>
+            client
+              .from('solutions')
+              .insert(solutionData)
+              .select('id, title, description, impact_score, effort_score, final_score, metric_ids')
+              .single()
+          )
+
+          if (insertedSolution) {
+            persistedSolutions.push({
+              id: insertedSolution.id,
+              title: insertedSolution.title,
+              description: insertedSolution.description,
+              impact_score: insertedSolution.impact_score,
+              effort_score: insertedSolution.effort_score,
+              final_score: insertedSolution.final_score,
+              assigned_metrics: insertedSolution.metric_ids
+            })
+          }
+        } catch (insertError) {
+          logger.error('Failed to persist solution', { error: insertError, solutionData })
+          throw new Error(`Failed to persist solution: ${insertError instanceof Error ? insertError.message : String(insertError)}`)
+        }
+      }
+
+      // Sort by final score (highest first)
+      persistedSolutions.sort((a, b) => b.final_score - a.final_score)
+
+      // 8. Send loaded state with results
+      const loadedChunk: ChatStreamChunk = {
+        type: 'context',
+        content: `Created ${persistedSolutions.length} prioritized solutions from ${hmwItems.length} HMW questions`,
+        data: {
+          id: contextId,
+          type: 'solution_loaded',
+          status: 'loaded',
+          results: persistedSolutions,
+          generation_method: solutionResponse.meta.generation_method,
+          context_summary: {
+            hmws_count: hmwItems.length,
+            insights_count: solutionContext.insights.length,
+            metrics_count: solutionContext.metrics.length,
+            jtbds_count: solutionContext.jtbds.length
+          }
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(loadedChunk)}\n\n`))
+
+      // 9. Send picker interface for solution review
+      const pickerItems = persistedSolutions.map(solution => ({
+        id: solution.id,
+        type: 'solution' as const,
+        title: solution.title,
+        content: solution.description,
+        score: solution.final_score,
+        metadata: {
+          impact_score: solution.impact_score,
+          effort_score: solution.effort_score,
+          assigned_metrics: solution.assigned_metrics
+        },
+        selected: false
+      }))
+
+      const pickerChunk: ChatStreamChunk = {
+        type: 'picker',
+        data: {
+          id: pickerId,
+          type: 'solution_picker',
+          items: pickerItems,
+          actions: ['view', 'prioritize', 'confirm'],
+          selectedCount: 0,
+          maxSelections: 10,
+          title: 'Prioritized Solutions',
+          description: 'Solutions sorted by final score (impact/effort ratio)'
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(pickerChunk)}\n\n`))
+
+      // 10. Persist assistant message
+      await this.persistAssistantMessage(
+        chatId,
+        request.userId,
+        `Created ${persistedSolutions.length} prioritized solutions from ${hmwItems.length} HMW questions using ${solutionResponse.meta.generation_method} method`,
+        'create_solutions',
+        Date.now() - startTime,
+        solutionResponse.solutions.length * 15 // Approximate tokens
+      )
+
+    } catch (error) {
+      // Send error state with reconciliation
+      const errorChunk: ChatStreamChunk = {
+        type: 'context',
+        content: `Failed to create solutions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: {
+          id: contextId,
+          type: 'solution_error',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`))
+
+      // Persist error message
+      await this.persistAssistantMessage(
+        chatId,
+        request.userId,
+        `Failed to create solutions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'create_solutions',
+        Date.now() - startTime,
+        50
+      )
+
+      logger.error('Solution creation failed in chat orchestrator', {
+        error: error instanceof Error ? error.message : String(error),
+        chatId,
+        userId: request.userId,
+        requestMessage: request.message
+      })
+    }
   }
 
   /**
@@ -917,7 +1173,7 @@ export class ChatOrchestrator {
   /**
    * Load or create chat session
    */
-  private async loadOrCreateChat(request: ChatRequest): Promise<{ chatId: UUID, chat: any }> {
+  private async loadOrCreateChat(request: ChatRequest): Promise<{ chatId: UUID, chat: { messages: unknown[] } }> {
     if (request.chatId) {
       // Load existing chat
       const chat = await this.sessionManager.loadChat(request.chatId, request.userId)
@@ -962,7 +1218,7 @@ Be concise, helpful, and focused on actionable advice. If users ask about specif
   /**
    * Build conversation context from chat history
    */
-  private buildConversationContext(messages: any[], currentMessage: string): string {
+  private buildConversationContext(messages: unknown[], currentMessage: string): string {
     let context = ''
     
     // Add recent messages for context (limited by token budget)

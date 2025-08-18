@@ -7,7 +7,7 @@ import type { UUID, Timestamp } from '../../database/types'
 
 // ===== CORE CONTEXT TYPES =====
 
-export type ContextItemType = 'document' | 'insight' | 'jtbd' | 'metric'
+export type ContextItemType = 'document' | 'insight' | 'jtbd' | 'metric' | 'hmw'
 
 export interface ContextItem {
   id: UUID
@@ -27,6 +27,7 @@ export interface ContextState {
   insights: ContextItem[]
   jtbds: ContextItem[]
   metrics: ContextItem[]
+  hmws: ContextItem[]
   totalItems: number
   lastUpdated: Timestamp
 }
@@ -242,8 +243,8 @@ export function isContextItem(obj: unknown): obj is ContextItem {
     'type' in obj &&
     'title' in obj &&
     'content' in obj &&
-    typeof (obj as any).id === 'string' &&
-    ['document', 'insight', 'jtbd', 'metric'].includes((obj as any).type)
+    typeof (obj as Record<string, unknown>).id === 'string' &&
+    ['document', 'insight', 'jtbd', 'metric', 'hmw'].includes((obj as Record<string, unknown>).type as string)
   )
 }
 
@@ -257,11 +258,13 @@ export function isContextState(obj: unknown): obj is ContextState {
     'insights' in obj &&
     'jtbds' in obj &&
     'metrics' in obj &&
+    'hmws' in obj &&
     'totalItems' in obj &&
-    Array.isArray((obj as any).documents) &&
-    Array.isArray((obj as any).insights) &&
-    Array.isArray((obj as any).jtbds) &&
-    Array.isArray((obj as any).metrics)
+    Array.isArray((obj as Record<string, unknown>).documents) &&
+    Array.isArray((obj as Record<string, unknown>).insights) &&
+    Array.isArray((obj as Record<string, unknown>).jtbds) &&
+    Array.isArray((obj as Record<string, unknown>).metrics) &&
+    Array.isArray((obj as Record<string, unknown>).hmws)
   )
 }
 
@@ -273,7 +276,7 @@ export function isContextOperation(obj: unknown): obj is ContextOperation {
     'chatId' in obj &&
     'userId' in obj &&
     'timestamp' in obj &&
-    ['add', 'remove', 'clear', 'update'].includes((obj as any).type)
+    ['add', 'remove', 'clear', 'update'].includes((obj as Record<string, unknown>).type as string)
   )
 }
 
@@ -284,9 +287,9 @@ export function isContextSelectionCriteria(obj: unknown): obj is ContextSelectio
     'itemType' in obj &&
     'itemId' in obj &&
     'userId' in obj &&
-    typeof (obj as any).itemType === 'string' &&
-    typeof (obj as any).itemId === 'string' &&
-    typeof (obj as any).userId === 'string' &&
-    ['document', 'insight', 'jtbd', 'metric'].includes((obj as any).itemType)
+    typeof (obj as Record<string, unknown>).itemType === 'string' &&
+    typeof (obj as Record<string, unknown>).itemId === 'string' &&
+    typeof (obj as Record<string, unknown>).userId === 'string' &&
+    ['document', 'insight', 'jtbd', 'metric', 'hmw'].includes((obj as Record<string, unknown>).itemType as string)
   )
 }

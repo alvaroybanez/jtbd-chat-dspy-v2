@@ -15,10 +15,21 @@
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",
     "@supabase/supabase-js": "^2.45.0",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/postcss": "^4.1.12",
+    "@tailwindcss/typography": "^0.5.16",
     "ai": "^5.0.0",
+    "autoprefixer": "^10.4.21",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.540.0",
     "next": "^15.0.0",
+    "postcss": "^8.5.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
+    "tailwindcss": "^4.1.12",
     "zod": "^3.25.76"
   },
   "devDependencies": {

@@ -20,7 +20,7 @@ import { FallbackGenerationError } from './types'
  * AI SDK V1/V2 compatibility adapter for language models
  * TODO: Remove when AI SDK V2 fully supports language models
  */
-function createCompatibleLanguageModel(model: any): LanguageModel {
+function createCompatibleLanguageModel(model: unknown): LanguageModel {
   return model as LanguageModel
 }
 

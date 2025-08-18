@@ -186,7 +186,7 @@ export class DSPyIntelligenceClient {
   private async makeRequest<T>(
     method: 'GET' | 'POST',
     endpoint: string,
-    body?: any
+    body?: unknown
   ): Promise<T> {
     const url = `${this.options.serviceUrl}${endpoint}`
     let lastError: Error | null = null
@@ -207,7 +207,7 @@ export class DSPyIntelligenceClient {
 
         if (!response.ok) {
           const errorText = await response.text()
-          let errorData: any = {}
+          let errorData: { message?: string } = {}
           
           try {
             errorData = JSON.parse(errorText)

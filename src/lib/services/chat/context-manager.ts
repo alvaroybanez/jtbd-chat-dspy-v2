@@ -571,18 +571,79 @@ class ContextManagerImpl implements ContextManager {
       case 'insight': return context.insights
       case 'jtbd': return context.jtbds
       case 'metric': return context.metrics
+      case 'hmw': return context.hmws
       default: return []
     }
   }
 
-  private async fetchItemData(itemType: ContextItemType, itemId: UUID, userId: UUID): Promise<any> {
-    // This would fetch actual data based on item type
-    // For now, return a placeholder structure
-    return {
-      id: itemId,
-      title: `${itemType} ${itemId.substring(0, 8)}`,
-      content: `Content for ${itemType}`,
-      metadata: {},
+  private async fetchItemData(itemType: ContextItemType, itemId: UUID, userId: UUID): Promise<{
+    id: string;
+    title: string;
+    content: string;
+    metadata: Record<string, unknown>;
+  } | null> {
+    try {
+      switch (itemType) {
+        case 'document':
+          return await executeQuery(async (client) => {
+            return await client
+              .from('documents')
+              .select('id, title, content, metadata')
+              .eq('id', itemId)
+              .eq('user_id', userId)
+              .single()
+          })
+        
+        case 'insight':
+          const insightResult = await executeQuery(async (client) => {
+            return await client
+              .from('insights')
+              .select('id, insight as content, document_id, metadata')
+              .eq('id', itemId)
+              .eq('user_id', userId)
+              .single()
+          })
+          return insightResult ? { ...insightResult, title: insightResult.content.substring(0, 50) + '...' } : null
+        
+        case 'jtbd':
+          const jtbdResult = await executeQuery(async (client) => {
+            return await client
+              .from('jtbds')
+              .select('id, statement, context, priority, metadata')
+              .eq('id', itemId)
+              .eq('user_id', userId)
+              .single()
+          })
+          return jtbdResult ? { ...jtbdResult, title: jtbdResult.statement.substring(0, 50) + '...', content: jtbdResult.statement } : null
+        
+        case 'metric':
+          const metricResult = await executeQuery(async (client) => {
+            return await client
+              .from('metrics')
+              .select('id, name, description, current_value, target_value, unit, metadata')
+              .eq('id', itemId)
+              .eq('user_id', userId)
+              .single()
+          })
+          return metricResult ? { ...metricResult, title: metricResult.name, content: metricResult.description || '' } : null
+        
+        case 'hmw':
+          const hmwResult = await executeQuery(async (client) => {
+            return await client
+              .from('hmws')
+              .select('id, question, score, reasoning, metadata')
+              .eq('id', itemId)
+              .eq('user_id', userId)
+              .single()
+          })
+          return hmwResult ? { ...hmwResult, title: hmwResult.question, content: hmwResult.reasoning || hmwResult.question } : null
+        
+        default:
+          return null
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch item data', { itemType, itemId, userId, error })
+      return null
     }
   }
 
@@ -612,6 +673,7 @@ class ContextManagerImpl implements ContextManager {
       selectedInsightIds: [...(chat.selectedInsightIds || [])],
       selectedJtbdIds: [...(chat.selectedJtbdIds || [])],
       selectedMetricIds: [...(chat.selectedMetricIds || [])],
+      selectedHmwIds: [...(chat.selectedHmwIds || [])],
     }
 
     if (operation.type === 'add' && operation.itemType && operation.itemId) {
@@ -635,6 +697,7 @@ class ContextManagerImpl implements ContextManager {
         updatedContext.selectedInsightIds = []
         updatedContext.selectedJtbdIds = []
         updatedContext.selectedMetricIds = []
+        updatedContext.selectedHmwIds = []
       }
     }
 
@@ -644,17 +707,19 @@ class ContextManagerImpl implements ContextManager {
       selectedInsightIds: updatedContext.selectedInsightIds,
       selectedJtbdIds: updatedContext.selectedJtbdIds,
       selectedMetricIds: updatedContext.selectedMetricIds,
+      selectedHmwIds: updatedContext.selectedHmwIds,
     }, userId)
   }
 
   private getArrayKeyForItemType(itemType: ContextItemType): keyof {
-    selectedDocumentIds: UUID[], selectedInsightIds: UUID[], selectedJtbdIds: UUID[], selectedMetricIds: UUID[]
+    selectedDocumentIds: UUID[], selectedInsightIds: UUID[], selectedJtbdIds: UUID[], selectedMetricIds: UUID[], selectedHmwIds: UUID[]
   } {
     switch (itemType) {
       case 'document': return 'selectedDocumentIds'
       case 'insight': return 'selectedInsightIds'
       case 'jtbd': return 'selectedJtbdIds'
       case 'metric': return 'selectedMetricIds'
+      case 'hmw': return 'selectedHmwIds'
       default: throw new Error(`Unknown item type: ${itemType}`)
     }
   }
@@ -672,6 +737,7 @@ class ContextManagerImpl implements ContextManager {
       insights: [],
       jtbds: [],
       metrics: [],
+      hmws: [],
       totalItems: 0,
       lastUpdated: new Date().toISOString(),
     }
@@ -1023,8 +1089,8 @@ class ContextManagerImpl implements ContextManager {
       const allItemIds = new Set<string>()
       const itemTypeMap = new Map<string, ContextItemType>()
 
-      usageEvents.forEach((event: any) => {
-        event.context_items?.forEach((item: any) => {
+      usageEvents.forEach((event: ContextUsageEvent) => {
+        event.contextItems?.forEach((item) => {
           allItemIds.add(item.itemId)
           itemTypeMap.set(item.itemId, item.itemType)
         })
@@ -1042,16 +1108,16 @@ class ContextManagerImpl implements ContextManager {
       }
 
       // Calculate summary statistics
-      const totalUsages = usageEvents.reduce((sum: number, event: any) => 
-        sum + (event.context_items?.length || 0), 0)
+      const totalUsages = usageEvents.reduce((sum: number, event: ContextUsageEvent) => 
+        sum + (event.contextItems?.length || 0), 0)
       
       const averageItemsPerMessage = usageEvents.length > 0 ? 
         totalUsages / usageEvents.length : 0
 
       // Find most used item type
       const typeUsageCounts = new Map<ContextItemType, number>()
-      usageEvents.forEach((event: any) => {
-        event.context_items?.forEach((item: any) => {
+      usageEvents.forEach((event: ContextUsageEvent) => {
+        event.contextItems?.forEach((item) => {
           const current = typeUsageCounts.get(item.itemType) || 0
           typeUsageCounts.set(item.itemType, current + 1)
         })
@@ -1198,7 +1264,7 @@ class ContextManagerImpl implements ContextManager {
 
   private generateUsageRecommendations(
     itemMetrics: ContextUsageMetrics[],
-    usageEvents: any[]
+    usageEvents: ContextUsageEvent[]
   ): string[] {
     const recommendations: string[] = []
 

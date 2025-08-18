@@ -126,7 +126,7 @@
   - Create chat archival endpoint
   - _Requirements: Full chat CRUD operations_
 
-- [ ] 9. Build chat orchestration and streaming API
+- [x] 9. Build chat orchestration and streaming API
 - [x] 9.1 Create main chat endpoint with intent routing
   - Implement POST /api/v1/chat with Server-Sent Events
   - Route requests based on detected intent
@@ -148,7 +148,7 @@
   - Persist selected HMWs with relationship data
   - _Requirements: 4.1, 4.4, 4.5, 4.6_
 
-- [ ] 9.4 Integrate solution creation with chat interface
+- [x] 9.4 Integrate solution creation with chat interface
   - Call Python DSPy service for solution creation
   - Handle DSPy failures with fallback generation
   - Present solutions sorted by final score
@@ -163,7 +163,7 @@
   - Handle message rendering with markdown support
   - _Requirements: Real-time chat interface_
 
-- [ ] 10.2 Build document upload interface with drag-and-drop
+- [x] 10.2 Build document upload interface with drag-and-drop
   - Create file upload zone with drag-and-drop support
   - Add file validation for .md/.txt formats and size limits
   - Implement upload progress indicators

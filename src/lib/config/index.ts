@@ -72,8 +72,13 @@ class ConfigurationManager {
       console.error('❌ Configuration validation failed:')
       console.error(errorMessage)
       
-      // Fail fast - exit process on configuration errors
-      process.exit(1)
+      // Fail fast - exit process on configuration errors (server-side only)
+      if (typeof process !== 'undefined' && process.exit) {
+        process.exit(1)
+      } else {
+        // In browser environment, throw error instead of exiting
+        throw new Error(`Configuration validation failed: ${errorMessage}`)
+      }
     }
   }
 
@@ -81,6 +86,17 @@ class ConfigurationManager {
    * Parse raw environment variables with validation
    */
   private parseRawEnvironment(): RawEnvironment {
+    // In browser environment, provide default values or use global window variables
+    if (typeof process === 'undefined' || !process.env) {
+      return RawEnvironmentSchema.parse({
+        NODE_ENV: 'development',
+        // Browser-safe defaults - these will be overridden by server-side config
+        OPENAI_API_KEY: 'browser-placeholder',
+        SUPABASE_URL: 'browser-placeholder',
+        SUPABASE_ANON_KEY: 'browser-placeholder',
+        DSPY_API_KEY: 'browser-placeholder',
+      })
+    }
     return RawEnvironmentSchema.parse(process.env)
   }
 
@@ -223,7 +239,15 @@ class ConfigurationManager {
 const configManager = ConfigurationManager.getInstance()
 
 // Main configuration export - backward compatible with existing usage
-export const config = configManager.config
+// Use a getter to make it lazy and avoid initialization errors on module load
+export const config = {
+  get openai() { return configManager.config.openai },
+  get supabase() { return configManager.config.supabase },
+  get dspy() { return configManager.config.dspy },
+  get app() { return configManager.config.app },
+  get vector() { return configManager.config.vector },
+  get file() { return configManager.config.file },
+}
 
 // Additional exports for more specific usage
 export { configManager }

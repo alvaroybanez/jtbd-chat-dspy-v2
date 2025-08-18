@@ -13,6 +13,7 @@ export interface ChatContext {
   selectedInsightIds?: UUID[]
   selectedJtbdIds?: UUID[]
   selectedMetricIds?: UUID[]
+  selectedHmwIds?: UUID[]
 }
 
 export interface ChatWithMessagesAndContext extends Chat {
@@ -25,6 +26,7 @@ export interface ChatWithMessagesAndContext extends Chat {
   selectedInsightIds: UUID[]
   selectedJtbdIds: UUID[]
   selectedMetricIds: UUID[]
+  selectedHmwIds: UUID[]
   metadata: Record<string, unknown>
 }
 

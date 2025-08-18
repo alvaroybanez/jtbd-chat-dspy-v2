@@ -125,8 +125,8 @@ export class TokenBudgetManager {
     maxTokens = this.maxTokens
   ): TruncationResult {
     const truncationLog: string[] = []
-    let workingMessages = [...messages]
-    let workingContextItems = [...contextItems]
+    const workingMessages = [...messages]
+    const workingContextItems = [...contextItems]
     
     const initialTokens = this.calculateTokenBudget(workingMessages, workingContextItems)
     

@@ -87,6 +87,7 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
               selected_insight_ids: context.selectedInsightIds || [],
               selected_jtbd_ids: context.selectedJtbdIds || [],
               selected_metric_ids: context.selectedMetricIds || [],
+              selected_hmw_ids: context.selectedHmwIds || [],
               total_tokens_used: 0,
               metadata: {},
             })
@@ -105,6 +106,7 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
         selectedInsightIds: context.selectedInsightIds || [],
         selectedJtbdIds: context.selectedJtbdIds || [],
         selectedMetricIds: context.selectedMetricIds || [],
+        selectedHmwIds: context.selectedHmwIds || [],
         metadata: {},
       }
 
@@ -189,14 +191,31 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
         throw new ChatNotFoundError(chatId, userId)
       }
 
-      const chat = chatResult as any
+      const chat = chatResult
       const result: ChatWithMessagesAndContext = {
         id: chat.id,
         user_id: chat.user_id,
         title: chat.title,
         created_at: chat.created_at,
         updated_at: chat.updated_at,
-        messages: (chat.chat_messages || []).map((msg: any) => ({
+        messages: (chat.chat_messages || []).map((msg: {
+          id: string;
+          role: string;
+          content: string;
+          created_at: string;
+          intent: string | null;
+          processing_time_ms: number | null;
+          tokens_used: number | null;
+          context_document_chunks: string[] | null;
+          context_insights: string[] | null;
+          context_jtbds: string[] | null;
+          context_metrics: string[] | null;
+          model_used: string | null;
+          temperature: number | null;
+          error_code: string | null;
+          error_message: string | null;
+          metadata: Record<string, unknown> | null;
+        }) => ({
           id: msg.id,
           chat_id: chatId,
           role: msg.role,
@@ -223,6 +242,7 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
         selectedInsightIds: chat.selected_insight_ids || [],
         selectedJtbdIds: chat.selected_jtbd_ids || [],
         selectedMetricIds: chat.selected_metric_ids || [],
+        selectedHmwIds: chat.selected_hmw_ids || [],
         metadata: chat.metadata || {},
       }
 
@@ -287,7 +307,7 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
       const offset = (page - 1) * pageSize
 
       // Build query
-      let query = executeQuery(async (client) => {
+      const query = executeQuery(async (client) => {
         let baseQuery = client
           .from('chats')
           .select(`
@@ -326,10 +346,25 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
         return baseQuery
       })
 
-      const { data: chats, count: totalItems } = await query as any
+      const queryResult = await query
+      const chats = queryResult?.data || []
+      const totalItems = queryResult?.count || 0
 
       // Transform results
-      const transformedChats: ChatWithMessagesAndContext[] = chats.map((chat: any) => ({
+      const transformedChats: ChatWithMessagesAndContext[] = chats.map((chat: {
+        id: string;
+        user_id: string;
+        title: string;
+        created_at: string;
+        updated_at: string;
+        status: string;
+        total_tokens_used: number;
+        selected_document_ids: string[];
+        selected_insight_ids: string[];
+        selected_jtbd_ids: string[];
+        selected_metric_ids: string[];
+        selected_hmw_ids: string[];
+      }) => ({
         id: chat.id,
         user_id: chat.user_id,
         title: chat.title,
@@ -344,6 +379,7 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
         selectedInsightIds: chat.selected_insight_ids || [],
         selectedJtbdIds: chat.selected_jtbd_ids || [],
         selectedMetricIds: chat.selected_metric_ids || [],
+        selectedHmwIds: chat.selected_hmw_ids || [],
         metadata: chat.metadata || {},
       }))
 
@@ -456,6 +492,7 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
               selected_insight_ids: context.selectedInsightIds || [],
               selected_jtbd_ids: context.selectedJtbdIds || [],
               selected_metric_ids: context.selectedMetricIds || [],
+              selected_hmw_ids: context.selectedHmwIds || [],
               updated_at: new Date().toISOString(),
             })
             .eq('id', chatId)
@@ -802,7 +839,8 @@ export class ChatSessionManagerImpl implements ChatSessionManager {
       (context.selectedDocumentIds?.length || 0) +
       (context.selectedInsightIds?.length || 0) +
       (context.selectedJtbdIds?.length || 0) +
-      (context.selectedMetricIds?.length || 0)
+      (context.selectedMetricIds?.length || 0) +
+      (context.selectedHmwIds?.length || 0)
     )
   }
 }
