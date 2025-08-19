@@ -180,6 +180,6 @@ if __name__ == "__main__":
         print(f"\n❌ Database connection failed: {result['error']}")
         print("\nPlease ensure:")
         print("1. SUPABASE_URL is set in your .env file")
-        print("2. SUPABASE_SECRET (service role key) is set in your .env file")
+        print("2. SUPABASE_KEY (or SUPABASE_SECRET) is set in your .env file")
         print("3. The Supabase project is running")
         print("4. The migration has been applied")

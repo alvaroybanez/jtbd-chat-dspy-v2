@@ -92,7 +92,7 @@ def render_error_state(error_message: str) -> None:
         
         **Environment Variables Required:**
         - `SUPABASE_URL`
-        - `SUPABASE_SECRET` (service role key) 
+        - `SUPABASE_KEY` (or `SUPABASE_SECRET`)
         - `OPENAI_API_KEY`
         
         **Check Configuration:**

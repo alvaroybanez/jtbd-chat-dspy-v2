@@ -67,20 +67,13 @@ RPC_SEARCH_JTBDS = "search_jtbds"
 
 # === ENVIRONMENT VARIABLE NAMES ===
 ENV_SUPABASE_URL = "SUPABASE_URL"
-ENV_SUPABASE_KEY = "SUPABASE_SECRET"  # Use service role key for backend access
+ENV_SUPABASE_KEY = "SUPABASE_KEY"  # Primary key variable
 ENV_OPENAI_API_KEY = "OPENAI_API_KEY"
 
 # Alternative environment variable names for flexibility
-ENV_SUPABASE_URL_ALTERNATIVES = [
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "VITE_SUPABASE_URL"
-]
+ENV_SUPABASE_URL_ALTERNATIVES = []  # No alternatives needed
 ENV_SUPABASE_KEY_ALTERNATIVES = [
-    "SUPABASE_KEY",  # Backward compatibility - anon/public key
-    "SUPABASE_ANON_KEY", 
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY",
-    "NEXT_SUPABASE_SECRET",
-    "VITE_SUPABASE_ANON_KEY"
+    "SUPABASE_SECRET",  # Alternative service role key name
 ]
 
 # === ERROR MESSAGES ===

@@ -36,10 +36,23 @@ def initialize_all_services(
         Dict with initialization results and service instances
     """
     try:
-        # Get or use provided core components
-        db = database_manager or get_database_manager()
-        embeddings = embedding_manager or get_embedding_manager()
-        llm = llm_wrapper or get_llm()
+        # Initialize core components if not provided
+        if not database_manager:
+            from ..core.database.connection import get_database_manager
+            database_manager = get_database_manager()
+            
+        if not llm_wrapper:
+            from ..core.llm_wrapper import initialize_llm
+            llm_wrapper = initialize_llm(database_manager)
+            
+        if not embedding_manager:
+            from ..core.embeddings import initialize_embedding_manager
+            embedding_manager = initialize_embedding_manager(llm_wrapper, database_manager)
+        
+        # Use the initialized components
+        db = database_manager
+        embeddings = embedding_manager
+        llm = llm_wrapper
 
         if not db:
             return {
