@@ -633,4 +633,337 @@ from ..core.exceptions import DatabaseError
 from .base_service import BaseService
 ```
 
-These patterns ensure consistency, maintainability, and reliability across the JTBD Assistant Platform codebase.
+## Conversational AI Patterns
+
+### Intent-Driven Response Pattern
+Route user messages through intent detection for appropriate response generation:
+
+```python
+def process_conversational_message(message: str, context: Dict) -> Dict[str, Any]:
+    """Standard conversational message processing pattern."""
+    
+    # 1. Intent Detection
+    intent = conversation_service.analyze_intent(message)
+    
+    # 2. Context Gathering (if needed)
+    search_results = None
+    if intent.needs_search:
+        search_results = search_service.search_all_types(
+            query=message,
+            search_types=determine_search_types(intent)
+        )
+    
+    # 3. Response Generation
+    response = conversation_service.generate_conversational_response(
+        message=message,
+        intent=intent,
+        search_results=search_results,
+        conversation_history=context.get('history', [])
+    )
+    
+    # 4. Follow-up Generation
+    if response["success"] and intent.is_exploration:
+        follow_ups = generate_follow_up_questions(message, response["content"])
+        response["follow_up_questions"] = follow_ups
+    
+    return response
+```
+
+### Temperature-Based Response Control
+Use different AI temperatures for different interaction modes:
+
+```python
+class ResponseModeManager:
+    """Manages AI response modes with appropriate temperature settings."""
+    
+    RESPONSE_MODES = {
+        "discovery": {
+            "temperature": DISCOVERY_TEMPERATURE,  # 0.9 - High creativity
+            "prompts": discovery_prompts,
+            "focus": "creative_exploration"
+        },
+        "expert": {
+            "temperature": CONVERSATION_TEMPERATURE,  # 0.7 - Balanced
+            "prompts": expert_prompts, 
+            "focus": "authoritative_guidance"
+        },
+        "synthesis": {
+            "temperature": CONVERSATION_TEMPERATURE,  # 0.7 - Structured
+            "prompts": synthesis_prompts,
+            "focus": "information_synthesis"
+        }
+    }
+    
+    def get_response_config(self, intent: MessageIntent) -> Dict[str, Any]:
+        """Get response configuration based on detected intent."""
+        if intent.is_exploration:
+            return self.RESPONSE_MODES["discovery"]
+        elif intent.is_search:
+            return self.RESPONSE_MODES["synthesis"]
+        else:
+            return self.RESPONSE_MODES["expert"]
+```
+
+### Fallback Intent Detection Pattern
+Provide robust intent detection with AI and heuristic fallbacks:
+
+```python
+def robust_intent_detection(message: str) -> MessageIntent:
+    """Intent detection with multiple fallback strategies."""
+    
+    # Primary: AI-powered intent detection
+    try:
+        ai_result = llm_wrapper.generate_chat_completion(
+            messages=get_intent_detection_prompt(message),
+            temperature=INTENT_DETECTION_TEMPERATURE  # 0.3 - Consistent
+        )
+        
+        if ai_result["success"]:
+            intent = parse_intent_response(ai_result["content"], message)
+            if intent.confidence >= INTENT_CONFIDENCE_THRESHOLD:
+                return intent
+    
+    except Exception as e:
+        logger.warning(f"AI intent detection failed: {e}")
+    
+    # Fallback: Heuristic classification
+    return heuristic_intent_detection(message)
+
+def heuristic_intent_detection(message: str) -> MessageIntent:
+    """Simple heuristic-based intent detection fallback."""
+    message_lower = message.lower().strip()
+    
+    # Question indicators
+    if message_lower.endswith('?') or any(word in message_lower for word in QUESTION_WORDS):
+        return MessageIntent("QUESTION", 0.6, True)
+    
+    # Search indicators
+    elif any(word in message_lower for word in SEARCH_WORDS):
+        return MessageIntent("SEARCH", 0.7, True)
+    
+    # Exploration indicators  
+    elif any(word in message_lower for word in EXPLORATION_WORDS):
+        return MessageIntent("EXPLORATION", 0.8, True)
+    
+    # Default to question for conversational approach
+    return MessageIntent("QUESTION", 0.5, True)
+```
+
+## Optimized File Architecture Patterns
+
+### Optimized vs Standard File Pattern
+The platform includes optimized versions of core components following professional UX standards:
+
+```python
+# File naming pattern for optimized components
+OPTIMIZED_FILE_PATTERN = {
+    "main.py": "main_optimized.py",           # Professional UX main app
+    "chat.py": "chat_optimized.py",           # 20/80 weight distribution
+    "metrics.py": "metrics_optimized.py",     # 15/85 weight distribution  
+}
+
+# Usage pattern in main app routing
+def get_page_module(page_name: str, use_optimized: bool = True):
+    """Get page module with optional optimized version."""
+    if use_optimized and f"{page_name}_optimized.py" exists:
+        return import_module(f"app.pages.{page_name}_optimized")
+    else:
+        return import_module(f"app.pages.{page_name}")
+```
+
+### Professional Layout Implementation Pattern
+Implement content-optimized weight distributions based on page type:
+
+```python
+class LayoutManager:
+    """Manages professional layout patterns across page types."""
+    
+    LAYOUT_CONFIGS = {
+        "conversational": {
+            "sidebar_width": 0.2,     # 20% for chat pages
+            "main_width": 0.8,        # 80% for content
+            "rationale": "Chat needs maximum space for conversation flow"
+        },
+        "data_table": {
+            "sidebar_width": 0.15,    # 15% for table pages  
+            "main_width": 0.85,       # 85% for data display
+            "rationale": "Tables need maximum horizontal space"
+        }
+    }
+    
+    def apply_layout(self, page_type: str):
+        """Apply appropriate layout for page type."""
+        config = self.LAYOUT_CONFIGS.get(page_type, self.LAYOUT_CONFIGS["conversational"])
+        
+        with st.sidebar:
+            # Sidebar content optimized for width
+            self._render_sidebar_content(config["sidebar_width"])
+        
+        # Main content uses remaining space
+        self._render_main_content(config["main_width"])
+```
+
+### Professional Emoji Usage Pattern
+Enforce professional emoji usage guidelines:
+
+```python
+class EmojiManager:
+    """Manages professional emoji usage across the application."""
+    
+    APPROVED_EMOJIS = {
+        "navigation": {"💬": "chat", "📊": "metrics", "💡": "insights", "🎯": "jtbds"},
+        "status": {"✅": "success", "⚠️": "warning", "❌": "error"},
+        "content": {"📄": "documents", "📈": "metrics", "🔍": "search"},
+        "actions": {"➕": "add", "📥": "import", "🗑️": "delete"}
+    }
+    
+    PROHIBITED_PATTERNS = [
+        r"[😊🚀✨🎉]",          # Emotional/personality emojis
+        r"(\S+\s*){2,}",        # Multiple emojis per element
+        r"(📄|📊|💡|🎯).+\1"   # Redundant emojis
+    ]
+    
+    def validate_emoji_usage(self, text: str) -> Dict[str, Any]:
+        """Validate text against professional emoji guidelines."""
+        issues = []
+        
+        # Check for prohibited patterns
+        for pattern in self.PROHIBITED_PATTERNS:
+            if re.search(pattern, text):
+                issues.append(f"Prohibited emoji pattern found: {pattern}")
+        
+        # Check for approved usage
+        emoji_count = len(re.findall(r'[^\w\s]', text))
+        if emoji_count > 1:
+            issues.append("Multiple emojis detected - use only one functional emoji")
+        
+        return {
+            "valid": len(issues) == 0,
+            "issues": issues,
+            "suggestions": self._generate_suggestions(text)
+        }
+```
+
+## Streamlit-Specific Patterns
+
+### Streamlit Session State Management
+Efficient session state patterns for conversational applications:
+
+```python
+def initialize_session_state():
+    """Initialize all required session state variables."""
+    defaults = {
+        "chat_messages": [],
+        "conversation_history": [],
+        "selected_context": {"insights": [], "jtbds": [], "metrics": []},
+        "workflow_stage": 1,
+        "token_budget": {"used": 0, "limit": MAX_CONTEXT_TOKENS},
+        "services_initialized": False
+    }
+    
+    for key, default_value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = default_value
+
+def update_session_state_safely(updates: Dict[str, Any]):
+    """Safely update multiple session state values."""
+    for key, value in updates.items():
+        if key in st.session_state:
+            st.session_state[key] = value
+        else:
+            logger.warning(f"Attempted to update non-existent session state key: {key}")
+```
+
+### Professional Streamlit Component Pattern
+Consistent component implementation with error handling:
+
+```python
+def render_professional_component(
+    title: str,
+    content_func: callable,
+    error_message: str = "Component failed to render",
+    show_loading: bool = True
+) -> bool:
+    """Standard pattern for rendering Streamlit components professionally."""
+    try:
+        if show_loading:
+            with st.spinner(f"Loading {title.lower()}..."):
+                success = content_func()
+        else:
+            success = content_func()
+        
+        return success
+    
+    except Exception as e:
+        logger.error(f"{title} component error: {e}")
+        st.error(f"{error_message}. Please try refreshing the page.")
+        return False
+
+# Usage example
+def render_chat_interface():
+    """Render chat interface with professional error handling."""
+    return render_professional_component(
+        title="Chat Interface",
+        content_func=lambda: _render_chat_content(),
+        error_message="Chat interface failed to load"
+    )
+```
+
+## Data Service Pattern
+
+### Centralized Data Retrieval Pattern
+Consistent data access through dedicated service layer:
+
+```python
+class DataService:
+    """Centralized data retrieval with consistent error handling."""
+    
+    def __init__(self):
+        self.db_manager = get_database_manager()
+        self.operations = DatabaseOperations(self.db_manager.client)
+    
+    def get_data_with_processing(
+        self, 
+        data_type: str,
+        processing_func: Optional[callable] = None
+    ) -> Dict[str, Any]:
+        """Standard data retrieval with optional processing."""
+        try:
+            # Get raw data
+            result = getattr(self.operations, f"get_all_{data_type}")()
+            
+            if not result.get("success"):
+                return result
+            
+            # Apply processing if provided
+            data = result.get(data_type, [])
+            if processing_func:
+                data = processing_func(data)
+            
+            return {
+                "success": True,
+                f"{data_type}": data,
+                "count": len(data)
+            }
+            
+        except Exception as e:
+            logger.error(f"Data service error for {data_type}: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to retrieve {data_type}: {str(e)}"
+            }
+
+# Usage pattern
+def get_processed_metrics():
+    """Get metrics with additional processing."""
+    def add_progress_calculation(metrics):
+        for metric in metrics:
+            if metric.get('current_value') and metric.get('target_value'):
+                progress = (metric['current_value'] / metric['target_value']) * 100
+                metric['progress_percentage'] = min(100, max(0, progress))
+        return metrics
+    
+    return data_service.get_data_with_processing("metrics", add_progress_calculation)
+```
+
+These advanced patterns ensure the JTBD Assistant Platform maintains consistency, professionalism, and reliability while supporting sophisticated conversational AI interactions and modern UX standards.

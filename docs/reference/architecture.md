@@ -4,7 +4,7 @@ This document provides a high-level overview of the JTBD Assistant Platform arch
 
 ## System Overview
 
-The JTBD Assistant Platform is a **single-user AI-powered Streamlit application** that transforms customer research into actionable insights through a conversational interface. The system follows a **vector-first approach** for content discovery and maintains simplicity by deliberately avoiding multi-tenancy complexity.
+The JTBD Assistant Platform is a **single-user AI-powered conversational discovery platform** built with Streamlit that transforms customer research into actionable insights through sophisticated AI interactions. The system combines **vector-first semantic search** with **advanced conversational AI** featuring intent detection, dynamic response generation, and contextual guidance.
 
 ### Technology Stack
 
@@ -16,14 +16,33 @@ The JTBD Assistant Platform is a **single-user AI-powered Streamlit application*
 
 ### High-Level Data Flow
 
+**Traditional Workflow (Still Supported):**
 ```
 Documents → Chunks → Embeddings → Vector Search → Context → HMW → Solutions
+```
+
+**Conversational Discovery Flow (Primary):**
+```
+User Message → Intent Detection → Dynamic Response Generation
+     ↓              ↓                        ↓
+Search Execution  Context Integration  Follow-up Questions
+     ↓              ↓                        ↓
+Result Synthesis  AI-Guided Discovery   Conversation Flow
+     ↓              ↓                        ↓
+Context Building  Insight Generation    Iterative Refinement
+```
+
+**Integrated Data Pipeline:**
+```
+Documents → Chunks → Embeddings → Semantic Search
     ↓
- Insights (extracted) → Embeddings → Search Results
+ Insights (extracted) → Embeddings → AI Context Integration
     ↓  
- JTBDs (user-defined) → Embeddings → Context Building
+ JTBDs (user-defined) → Embeddings → Conversational Discovery
     ↓
  Metrics (performance) → Context Building → Solution Scoring
+                            ↓
+              Conversational AI ↔ Dynamic Context Building
 ```
 
 ## Architecture Layers
@@ -40,20 +59,76 @@ The foundation layer providing essential infrastructure:
 
 ### 2. Services Layer (`app/services/`)
 
-Business logic and workflow orchestration:
+Business logic and conversational workflow orchestration:
 
-- **Search Service**: Multi-type semantic search across content
+- **Conversation Service**: Advanced AI with intent detection and response generation
+- **Search Service**: Multi-type semantic search across content  
+- **Data Service**: Centralized data retrieval for UI components
 - **Context Manager**: Token budget management and session state
 - **Chat Service**: Query processing and response building
+- **JTBD Service**: Jobs-to-be-Done management and operations
+- **Metric Service**: Performance metrics tracking and management
 - **Initialization**: Dependency management and service startup
 
 ### 3. UI Layer (`app/ui/`)
 
-Presentation and user interaction:
+Professional conversational interface with optimized layouts:
 
-- **Chat Interface**: Main conversational interface
+- **Chat Interface**: AI-powered conversational discovery with workflow stepper
 - **Selection Components**: Result cards, context building, token visualization
-- **Session Management**: Chat history and state persistence
+- **Form Components**: JTBD and metric creation with validation
+- **Professional Layout**: Content-optimized weight distributions (20/80, 15/85)
+- **Session Management**: Chat history and state persistence across interactions
+
+## Conversational Architecture
+
+### Intent-Driven Response System
+
+The platform uses sophisticated AI-powered intent detection to provide contextually appropriate responses:
+
+```python
+User Message → Intent Analysis → Response Strategy Selection
+     ↓               ↓                     ↓
+ "Let's explore..." → EXPLORATION → Discovery Mode (High Creativity)
+ "Find insights..." → SEARCH → Search-Guided Mode (Synthesis Focus)  
+ "How do I..." → QUESTION → Expert Consultation (Authoritative)
+ "Create JTBD..." → ACTION → Task Execution (Direct)
+```
+
+### Conversational Flow Management
+
+**Multi-Modal Response Generation:**
+- **Discovery Responses**: Creative exploration with higher AI temperature
+- **Expert Consultation**: Knowledgeable guidance with balanced temperature
+- **Search Synthesis**: Structured information synthesis with context
+- **Follow-Up Generation**: Automatic question creation for conversation flow
+
+### Context Integration Patterns
+
+**Dynamic Context Building:**
+```python
+Search Results + User Intent + Conversation History → AI Context
+                                ↓
+                    Personalized Response Generation
+                                ↓
+                    Follow-Up Questions + Action Suggestions
+```
+
+**Temperature-Controlled Generation:**
+- Intent Detection: 0.3 (consistent classification)
+- Discovery Mode: Higher temperature (creative exploration)
+- Expert Mode: Balanced temperature (accurate + engaging)
+- Follow-ups: 0.8 (diverse question generation)
+
+### Optimized File Architecture
+
+The system includes optimized versions of core components for enhanced performance:
+
+- **`main_optimized.py`**: Professional UX with content-optimized layouts
+- **`chat_optimized.py`**: Conversational interface with 20/80 weight distribution
+- **`metrics_optimized.py`**: Data tables with 15/85 layout optimization
+
+These follow professional design patterns established in the UX specification.
 
 ## Design Patterns
 
@@ -99,6 +174,16 @@ Service initialization uses factory functions to manage complex dependency chain
 - **Decision**: DSPy enhancement with OpenAI fallback
 - **Rationale**: Reliability over advanced features
 - **Impact**: System remains functional even if DSPy fails
+
+### Conversational-First Design
+- **Decision**: AI-powered conversational interface as primary interaction method
+- **Rationale**: More intuitive for users of all skill levels, enables guided discovery
+- **Impact**: Enhanced user experience but increased AI service dependency
+
+### Professional UX Standards  
+- **Decision**: Content-optimized weight distributions and professional typography
+- **Rationale**: Maximize usable space and create professional appearance
+- **Impact**: Better user experience and higher content density
 
 ### Functional Programming Preference
 - **Decision**: Pure functions, immutability where practical

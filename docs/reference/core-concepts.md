@@ -215,6 +215,172 @@ results = search_service.search_all_types(
 )
 ```
 
+## Conversational AI System
+
+The platform includes sophisticated conversational AI capabilities through centralized prompt management and intent detection.
+
+### Prompts Module (`app/core/prompts.py`)
+
+The prompts module centralizes all AI interaction templates and conversation management:
+
+```python
+# Core system prompts for different interaction modes
+JTBD_EXPERT_SYSTEM_PROMPT = """You are a Jobs-to-be-Done (JTBD) expert and business strategist..."""
+DISCOVERY_SYSTEM_PROMPT = """You are in discovery mode, helping the user explore and brainstorm..."""
+SYNTHESIS_SYSTEM_PROMPT = """You are helping synthesize research findings and data..."""
+INTENT_DETECTION_SYSTEM_PROMPT = """Analyze user messages to determine their intent..."""
+```
+
+**Prompt Generation Functions:**
+```python
+def get_jtbd_expert_prompt(user_question: str, context: Optional[str], conversation_history: Optional[List]) -> List[Dict[str, str]]:
+    """Generate JTBD expert conversation prompt with context."""
+    
+def get_discovery_prompt(user_question: str, context: Optional[str]) -> List[Dict[str, str]]:
+    """Generate discovery-focused conversation prompt."""
+    
+def get_intent_detection_prompt(message: str) -> List[Dict[str, str]]:
+    """Generate intent detection prompt."""
+
+def format_search_context(search_results: Dict[str, List[Dict]]) -> str:
+    """Format search results into readable context for AI responses."""
+```
+
+### Intent Detection System
+
+**Message Classification:**
+```python
+# Intent types supported by the system
+INTENT_TYPES = [
+    "QUESTION",     # User seeks explanation or guidance
+    "SEARCH",       # User wants to find specific content
+    "EXPLORATION",  # User wants to brainstorm or discover
+    "ACTION"        # User wants to perform a task
+]
+
+# Classification confidence threshold
+INTENT_CONFIDENCE_THRESHOLD = 0.7
+```
+
+**Intent Analysis Process:**
+```python
+def analyze_intent_flow(message: str) -> MessageIntent:
+    """Complete intent analysis with AI and fallback classification"""
+    
+    # Primary: AI-powered intent detection
+    ai_result = llm_wrapper.generate_chat_completion(
+        messages=get_intent_detection_prompt(message),
+        temperature=0.3  # Low temperature for consistent classification
+    )
+    
+    # Fallback: Heuristic pattern matching
+    if not ai_result.success or confidence < INTENT_CONFIDENCE_THRESHOLD:
+        return fallback_intent_detection(message)
+    
+    return parse_intent_response(ai_result.content, message)
+```
+
+### Conversational Response Modes
+
+**Temperature-Controlled Generation:**
+```python
+# Different temperatures for different conversation modes
+CONVERSATION_TEMPERATURE = 0.7      # Balanced responses for general conversation
+DISCOVERY_TEMPERATURE = 0.9         # Higher creativity for exploration
+INTENT_DETECTION_TEMPERATURE = 0.3  # Consistent classification
+FOLLOW_UP_TEMPERATURE = 0.8         # Creative question generation
+```
+
+**Response Type Configuration:**
+```python
+RESPONSE_MODES = {
+    "discovery": {
+        "temperature": DISCOVERY_TEMPERATURE,
+        "system_prompt": DISCOVERY_SYSTEM_PROMPT,
+        "focus": "creative_exploration"
+    },
+    "expert": {
+        "temperature": CONVERSATION_TEMPERATURE, 
+        "system_prompt": JTBD_EXPERT_SYSTEM_PROMPT,
+        "focus": "knowledgeable_guidance"
+    },
+    "synthesis": {
+        "temperature": CONVERSATION_TEMPERATURE,
+        "system_prompt": SYNTHESIS_SYSTEM_PROMPT,
+        "focus": "information_synthesis"
+    }
+}
+```
+
+### Follow-Up Question Generation
+
+**Automatic Question Creation:**
+```python
+def generate_follow_up_questions(user_message: str, assistant_response: str) -> List[str]:
+    """Generate contextually relevant follow-up questions"""
+    
+    follow_up_prompt = FOLLOW_UP_GENERATION_PROMPT.format(
+        user_message=user_message,
+        assistant_response=assistant_response
+    )
+    
+    result = llm_wrapper.generate_chat_completion(
+        messages=[{"role": "user", "content": follow_up_prompt}],
+        temperature=FOLLOW_UP_TEMPERATURE
+    )
+    
+    return parse_follow_up_questions(result.content)
+```
+
+**Follow-Up Characteristics:**
+- Build naturally on current conversation topic
+- Explore different angles and implications  
+- Help users discover new insights
+- Remain specific and actionable
+- Limited to MAX_FOLLOW_UP_QUESTIONS (typically 3)
+
+### Context Integration Patterns
+
+**Search Context Formatting:**
+```python
+def format_search_context(search_results: Dict[str, List[Dict]]) -> str:
+    """Format multi-type search results for AI consumption"""
+    context_parts = []
+    
+    for content_type, items in search_results.items():
+        if content_type == "chunks":
+            for chunk in items[:5]:
+                context_parts.append(f"Document: {chunk['content'][:300]}...")
+        elif content_type == "insights":
+            for insight in items[:5]:
+                context_parts.append(f"Insight: {insight['description']}")
+        elif content_type == "jtbds":
+            for jtbd in items[:5]:
+                jtbd_text = f"JTBD: {jtbd['statement']}"
+                if jtbd.get('context'):
+                    jtbd_text += f" (Context: {jtbd['context']})"
+                context_parts.append(jtbd_text)
+    
+    return "\n".join(context_parts)
+```
+
+### Conversation History Management
+
+**Context Window Management:**
+```python
+MAX_CONVERSATION_HISTORY = 5  # Maximum exchanges to maintain
+
+def manage_conversation_context(history: List[Dict], new_message: str) -> List[Dict]:
+    """Manage conversation history within context limits"""
+    history.append({"role": "user", "content": new_message})
+    
+    # Maintain sliding window of recent conversation
+    if len(history) > MAX_CONVERSATION_HISTORY * 2:  # 2 messages per exchange
+        history = history[-(MAX_CONVERSATION_HISTORY * 2):]
+    
+    return history
+```
+
 ## Configuration Management
 
 All system constants are centralized in `app/core/constants.py` for maintainability.
@@ -243,6 +409,17 @@ DEFAULT_CHAT_MODEL = "gpt-4o-mini"           # Default chat model
 MAX_RETRIES = 3                              # Maximum API retries
 BASE_RETRY_DELAY_MS = 1000                   # Base retry delay
 DEFAULT_TEMPERATURE = 0.7                    # Default temperature
+```
+
+**Conversational AI Configuration:**
+```python
+CONVERSATION_TEMPERATURE = 0.7               # Balanced conversation responses
+DISCOVERY_TEMPERATURE = 0.9                  # Creative exploration responses
+INTENT_DETECTION_TEMPERATURE = 0.3           # Consistent intent classification
+FOLLOW_UP_TEMPERATURE = 0.8                  # Creative question generation
+MAX_CONVERSATION_HISTORY = 5                 # Maximum conversation exchanges to track
+MAX_FOLLOW_UP_QUESTIONS = 3                  # Maximum follow-up questions per response
+INTENT_CONFIDENCE_THRESHOLD = 0.7            # Minimum confidence for AI intent detection
 ```
 
 ### Environment Variables

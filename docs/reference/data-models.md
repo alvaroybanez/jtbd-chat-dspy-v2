@@ -8,11 +8,12 @@ The platform uses a **PostgreSQL database with pgvector extension** for vector s
 
 ### Schema Design Principles
 
-- **Single-User System**: No org_id or multi-tenancy complexity
+- **Single-User System**: No org_id or multi-tenancy complexity, RLS disabled for simplicity
 - **Vector-First**: All searchable content has embeddings (1536-dimension)
 - **Relationship Tracking**: Many-to-many tables connect related entities
-- **Audit Trail**: Created timestamps and LLM trace logging
+- **Audit Trail**: Created timestamps and enhanced LLM trace logging with retry tracking
 - **Data Integrity**: Foreign keys, check constraints, and validation
+- **Conversational Support**: Enhanced schema supports conversational AI workflows
 
 ## Core Tables
 
@@ -279,13 +280,14 @@ CREATE TABLE llm_traces (
     latency_ms INT,
     success BOOLEAN DEFAULT true,
     error_message TEXT,
+    retry_count INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
 **Fields:**
 - `id`: Unique trace identifier
-- `operation`: Type of LLM operation (embedding, chat_completion, etc.)
+- `operation`: Type of LLM operation (embedding, chat_completion, intent_detection, follow_up_generation, etc.)
 - `model`: AI model used (gpt-4o-mini, text-embedding-3-small)
 - `prompt_summary`: Truncated prompt for debugging
 - `response_summary`: Truncated response content
@@ -294,7 +296,15 @@ CREATE TABLE llm_traces (
 - `latency_ms`: Response time in milliseconds
 - `success`: Operation success status
 - `error_message`: Error details if failed
+- `retry_count`: Number of retry attempts made (added for enhanced error tracking)
 - `created_at`: Operation timestamp
+
+**Enhanced Conversational AI Tracking:**
+The `operation` field now includes conversational AI operations:
+- `intent_detection`: User message intent classification
+- `conversation_response`: Conversational AI response generation
+- `follow_up_generation`: Automatic follow-up question creation
+- `context_synthesis`: Search result synthesis into conversation context
 
 ## Relationship Tables
 

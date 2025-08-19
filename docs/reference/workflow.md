@@ -4,14 +4,187 @@ This document describes the complete Jobs-to-be-Done workflow implemented by the
 
 ## Workflow Overview
 
-The JTBD Assistant Platform implements a **systematic workflow** for transforming customer research into actionable solutions:
+The JTBD Assistant Platform implements both **conversational discovery workflows** and **systematic linear workflows** for transforming customer research into actionable solutions.
 
+### Conversational Discovery Workflow (Primary)
+
+**Non-Linear, AI-Guided Approach:**
+```
+User Input → Intent Detection → Dynamic Response → Follow-Up Questions
+    ↓              ↓                    ↓               ↓
+Search Execution  Context Building  Insight Generation  Iterative Discovery
+    ↓              ↓                    ↓               ↓
+Result Synthesis  AI Guidance       Knowledge Building  Workflow Progression
+```
+
+### Traditional Linear Workflow (Available)
+
+**Systematic Step-by-Step Approach:**
 ```
 1. Document Ingestion → 2. Content Processing → 3. Insight Extraction →
 4. JTBD Definition → 5. Context Building → 6. HMW Generation → 7. Solution Creation
 ```
 
-Each stage builds upon the previous one, with **vector embeddings** enabling semantic connections throughout the process.
+Both approaches leverage **vector embeddings** for semantic connections, but the conversational workflow enables **dynamic discovery** based on user intent and context.
+
+## Conversational Discovery Stages
+
+### Stage 1: Search & Select (Discovery Mode)
+
+**Conversational Search Process:**
+```python
+def conversational_search_flow(user_message: str):
+    """Handle conversational search and discovery"""
+    
+    # 1. Intent Detection
+    intent = conversation_service.analyze_intent(user_message)
+    
+    # 2. Execute Search (if needed)
+    if intent.needs_search:
+        search_results = search_service.search_all_types(
+            query=user_message,
+            search_types=determine_search_types(intent),
+            similarity_threshold=adjust_threshold_for_intent(intent)
+        )
+    
+    # 3. Generate Contextual Response
+    response = conversation_service.generate_conversational_response(
+        message=user_message,
+        intent=intent,
+        search_results=search_results,
+        conversation_history=get_chat_history()
+    )
+    
+    # 4. Present Results with Follow-ups
+    return {
+        "ai_response": response["content"],
+        "search_results": search_results,
+        "follow_up_questions": response["follow_up_questions"],
+        "suggested_actions": generate_context_suggestions(search_results)
+    }
+```
+
+**Key Features:**
+- **Intent-Aware Search**: Search strategy adapts to user intent (exploration vs. specific lookup)
+- **Dynamic Threshold Adjustment**: Similarity thresholds adjust based on intent confidence
+- **Contextual Result Presentation**: Results synthesized into conversational responses
+- **Automated Follow-ups**: AI generates relevant questions to deepen discovery
+
+### Stage 2: Build Context (AI-Guided)
+
+**Intelligent Context Building:**
+```python
+def ai_guided_context_building(selected_items: List[str], user_goals: str):
+    """AI-assisted context building and optimization"""
+    
+    # 1. Analyze Current Context
+    context_analysis = analyze_context_completeness(selected_items)
+    
+    # 2. Identify Gaps
+    gaps = identify_context_gaps(selected_items, user_goals)
+    
+    # 3. Generate Recommendations
+    recommendations = generate_context_recommendations(gaps, context_analysis)
+    
+    # 4. Check Token Budget
+    budget_status = check_token_budget(selected_items)
+    
+    return {
+        "context_strength": context_analysis["strength_score"],
+        "missing_elements": gaps,
+        "recommendations": recommendations,
+        "budget_status": budget_status,
+        "ready_for_hmw": context_analysis["hmw_ready"]
+    }
+```
+
+**AI Assistance Features:**
+- **Context Gap Analysis**: Identifies missing elements for comprehensive understanding
+- **Smart Recommendations**: Suggests additional content to strengthen context
+- **Token Budget Optimization**: Manages context size within AI model limits
+- **Readiness Assessment**: Evaluates context completeness for HMW generation
+
+### Stage 3: Generate HMWs (Synthesis Mode)
+
+**AI-Powered HMW Generation:**
+```python
+def conversational_hmw_generation(context: Dict, user_focus: str):
+    """Generate HMWs through conversational AI synthesis"""
+    
+    # 1. Prepare Context for AI
+    formatted_context = format_context_for_hmw_generation(context)
+    
+    # 2. Generate Initial HMWs
+    hmw_candidates = llm_wrapper.generate_hmws(
+        context=formatted_context,
+        focus_area=user_focus,
+        temperature=DISCOVERY_TEMPERATURE  # Higher creativity
+    )
+    
+    # 3. Refine Through Conversation
+    refined_hmws = []
+    for hmw in hmw_candidates:
+        feedback = get_conversational_feedback(hmw, context)
+        refined_hmw = refine_hmw_based_on_feedback(hmw, feedback)
+        refined_hmws.append(refined_hmw)
+    
+    # 4. Prioritize and Rank
+    prioritized_hmws = prioritize_hmws(refined_hmws, context)
+    
+    return {
+        "generated_hmws": prioritized_hmws,
+        "generation_context": formatted_context,
+        "refinement_suggestions": generate_refinement_questions(prioritized_hmws)
+    }
+```
+
+### Stage 4: Explore & Chat (Interactive Refinement)
+
+**Continuous Conversational Refinement:**
+```python
+def interactive_exploration_stage(hmws: List[str], context: Dict):
+    """Enable continuous exploration and refinement"""
+    
+    conversation_modes = {
+        "EXPLORATION": {
+            "temperature": DISCOVERY_TEMPERATURE,
+            "prompts": discovery_prompts,
+            "focus": "creative_brainstorming"
+        },
+        "ANALYSIS": {
+            "temperature": CONVERSATION_TEMPERATURE,
+            "prompts": analytical_prompts,
+            "focus": "deep_analysis"
+        },
+        "REFINEMENT": {
+            "temperature": CONVERSATION_TEMPERATURE,
+            "prompts": refinement_prompts,
+            "focus": "iterative_improvement"
+        }
+    }
+    
+    # Allow dynamic switching between modes based on user intent
+    current_mode = detect_conversation_mode(user_message)
+    
+    response = generate_contextual_response(
+        user_message=user_message,
+        hmws=hmws,
+        context=context,
+        mode=conversation_modes[current_mode]
+    )
+    
+    return response
+```
+
+**Interactive Features:**
+- **Mode Switching**: Dynamically switches between exploration, analysis, and refinement
+- **Contextual Memory**: Maintains conversation context across interactions
+- **Iterative Improvement**: Continuous refinement based on user feedback
+- **Multi-Modal Responses**: Adapts response style to conversation mode
+
+## Traditional Linear Workflow Stages
+
+*Note: These stages are still available but are now enhanced with conversational capabilities.*
 
 ## Stage 1: Document Ingestion
 

@@ -9,6 +9,8 @@ The services layer implements the business logic of the JTBD Assistant Platform 
 - **Search Service**: Multi-type semantic search and result ranking
 - **Context Manager**: Session state and token budget management
 - **Chat Service**: Query processing and conversational interface
+- **Conversation Service**: Advanced conversational AI with intent detection and response generation
+- **Data Service**: Centralized data retrieval operations for UI components
 - **JTBD Service**: Jobs-to-be-Done management and operations
 - **Metric Service**: Performance metrics tracking and management
 - **Initialization Service**: Dependency management and service coordination
@@ -260,6 +262,254 @@ class ChatService:
 }
 ```
 
+## Conversation Service (`app/services/conversation_service.py`)
+
+The Conversation Service provides advanced conversational AI capabilities with intent detection, dynamic response generation, and follow-up question creation.
+
+### Core Functionality
+
+```python
+class ConversationService:
+    """Service for handling conversational AI interactions and intent detection."""
+    
+    def __init__(self, llm_wrapper: Optional[Any] = None) -> None:
+        self.llm = llm_wrapper or get_llm()
+    
+    def analyze_intent(self, message: str) -> MessageIntent:
+        """Analyze user message to determine intent and processing approach."""
+    
+    def generate_conversational_response(
+        self, 
+        message: str, 
+        intent: MessageIntent,
+        search_results: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """Generate a conversational AI response based on intent and context."""
+```
+
+### Intent Detection and Classification
+
+**MessageIntent Class:**
+```python
+class MessageIntent:
+    """Represents the detected intent of a user message."""
+    
+    def __init__(self, intent_type: str, confidence: float, needs_search: bool, topics: Optional[List[str]] = None):
+        self.intent_type = intent_type  # QUESTION, SEARCH, EXPLORATION, ACTION
+        self.confidence = confidence
+        self.needs_search = needs_search
+        self.topics = topics or []
+```
+
+**Intent Types:**
+- **QUESTION**: User seeks explanation, information, or guidance
+- **SEARCH**: User wants to find specific content or data
+- **EXPLORATION**: User wants to brainstorm, discover, or think through topics
+- **ACTION**: User wants to perform a specific task or command
+
+**Intent Analysis Process:**
+```python
+# Example intent detection
+intent = conversation_service.analyze_intent("How can we improve mobile checkout?")
+# Returns: MessageIntent("EXPLORATION", 0.85, True, ["mobile", "checkout"])
+
+intent = conversation_service.analyze_intent("Find insights about payment issues")
+# Returns: MessageIntent("SEARCH", 0.92, True, ["insights", "payment", "issues"])
+```
+
+### Response Generation Modes
+
+**Discovery Response:**
+- Used for EXPLORATION intent type
+- Encourages open-ended thinking and brainstorming
+- Uses higher temperature (DISCOVERY_TEMPERATURE) for creative responses
+- Generates follow-up questions to deepen exploration
+
+**Search-Guided Response:**
+- Used for SEARCH intent type
+- Synthesizes search results into helpful guidance
+- Provides structured information and recommendations
+- Suggests refinement strategies when no results found
+
+**Expert Response:**
+- Used for QUESTION intent type
+- Leverages JTBD expertise and knowledge
+- Provides thoughtful, strategic guidance
+- Maintains conversational context across exchanges
+
+### Response Structure
+
+```python
+{
+    "success": True,
+    "content": "Based on your mobile checkout question...",
+    "response_type": "conversational",  # or "search_guided", "general"
+    "intent_type": "EXPLORATION",
+    "follow_up_questions": [
+        "What specific pain points do users experience?",
+        "How does mobile performance compare to desktop?",
+        "What metrics would indicate success?"
+    ],
+    "has_context": True,
+    "tokens_used": 850,
+    "model": "gpt-4"
+}
+```
+
+### Follow-Up Question Generation
+
+**Automatic Follow-Up Creation:**
+```python
+def _generate_follow_up_questions(self, user_message: str, assistant_response: str) -> List[str]:
+    """Generate relevant follow-up questions based on conversation flow."""
+```
+
+**Follow-Up Characteristics:**
+- Build naturally on current topic
+- Explore different angles or implications
+- Help users discover new insights
+- Remain specific and actionable
+- Limited to MAX_FOLLOW_UP_QUESTIONS (typically 3)
+
+### Temperature Settings
+
+**Response Temperature Control:**
+- **Intent Detection**: 0.3 (consistent classification)
+- **Discovery Mode**: DISCOVERY_TEMPERATURE (creative exploration)
+- **Conversation Mode**: CONVERSATION_TEMPERATURE (balanced responses)
+- **Follow-Up Generation**: 0.8 (creative question generation)
+
+### Error Handling and Fallbacks
+
+**Fallback Intent Detection:**
+```python
+def _fallback_intent_detection(self, message: str) -> MessageIntent:
+    """Fallback intent detection using simple heuristics."""
+    # Uses keyword matching and message patterns
+    # Provides reasonable defaults when AI analysis fails
+```
+
+**Graceful Degradation:**
+- AI failures fall back to heuristic classification
+- Empty responses trigger helpful guidance prompts
+- Context-free responses still provide value
+- Service remains functional during API issues
+
+## Data Service (`app/services/data_service.py`)
+
+The Data Service centralizes data retrieval operations for table views and UI components, providing clean interfaces for accessing database content.
+
+### Core Functionality
+
+```python
+class DataService:
+    """Service for data retrieval operations used by table views."""
+
+    def __init__(self):
+        self.db_manager = get_database_manager()
+        self.operations = DatabaseOperations(self.db_manager.client)
+    
+    def get_all_metrics(self) -> Dict[str, Any]:
+        """Retrieve all metrics for display."""
+    
+    def get_all_insights(self) -> Dict[str, Any]:
+        """Retrieve all insights with source document information."""
+    
+    def get_all_jtbds(self) -> Dict[str, Any]:
+        """Retrieve all Jobs to be Done for display."""
+    
+    def get_summary_statistics(self) -> Dict[str, Any]:
+        """Get summary statistics for all data types."""
+```
+
+### Data Retrieval Operations
+
+**Metrics Retrieval:**
+```python
+result = data_service.get_all_metrics()
+# Returns:
+{
+    "success": True,
+    "metrics": [
+        {
+            "id": "uuid",
+            "name": "Cart Abandonment Rate",
+            "current_value": 23.5,
+            "target_value": 15.0,
+            "unit": "percentage",
+            "description": "Percentage of users who...",
+            "created_at": "2024-01-15T10:30:00Z"
+        }
+    ],
+    "count": 12
+}
+```
+
+**Insights Retrieval:**
+```python
+result = data_service.get_all_insights()
+# Returns insights with document relationships:
+{
+    "success": True,
+    "insights": [
+        {
+            "id": "uuid",
+            "description": "Users struggle with complex checkout process",
+            "documents": {
+                "id": "doc_uuid",
+                "title": "User Research Report Q4"
+            },
+            "created_at": "2024-01-15T10:30:00Z"
+        }
+    ],
+    "count": 25
+}
+```
+
+**JTBDs Retrieval:**
+```python
+result = data_service.get_all_jtbds()
+# Returns complete JTBD data:
+{
+    "success": True,
+    "jtbds": [
+        {
+            "id": "uuid",
+            "statement": "When shopping on mobile, I want faster checkout...",
+            "context": "Mobile e-commerce optimization",
+            "outcome": "Reduced abandonment rates",
+            "created_at": "2024-01-15T10:30:00Z"
+        }
+    ],
+    "count": 8
+}
+```
+
+### Data Processing Features
+
+**Field Normalization:**
+- Ensures required fields exist with defaults
+- Handles missing document relationships gracefully
+- Provides consistent data structure for UI components
+
+**Error Handling:**
+- Robust error handling with detailed error messages
+- Graceful degradation when database operations fail
+- Consistent return format across all methods
+
+**Usage in UI Components:**
+```python
+# In Streamlit pages
+data_service = DataService()
+metrics_result = data_service.get_all_metrics()
+
+if metrics_result["success"]:
+    st.dataframe(metrics_result["metrics"])
+else:
+    st.error(f"Failed to load metrics: {metrics_result['error']}")
+```
+
 ## JTBD Service (`app/services/jtbd_service.py`)
 
 The JTBD Service manages Jobs-to-be-Done statements, their embeddings, and related operations.
@@ -462,10 +712,16 @@ context_manager = initialize_context_manager(max_context_tokens)
 # 3. JTBD service (requires db + embeddings)
 jtbd_service = initialize_jtbd_service(database_manager, embedding_manager)
 
-# 4. Metric service (requires db)
+# 4. Conversation service (requires llm)
+conversation_service = initialize_conversation_service(llm_wrapper)
+
+# 5. Data service (requires db)
+data_service = DataService()
+
+# 6. Metric service (requires db)
 metric_service = initialize_metric_service(database_manager)
 
-# 5. Chat service (requires search + context)
+# 7. Chat service (requires search + context)
 chat_service = initialize_chat_service(search_service, context_manager)
 ```
 

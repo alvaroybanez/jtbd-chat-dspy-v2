@@ -13,11 +13,12 @@ The UI layer follows a **component-based architecture** using Streamlit's native
 
 ### Design Principles
 
-- **Conversational First**: Chat-based interaction as primary interface
+- **Conversational First**: AI-powered chat interface with intent detection and dynamic responses
+- **Professional Layout**: Content-optimized weight distributions (20/80 for chat, 15/85 for tables)
 - **Context Awareness**: Visual feedback on selected items and token budget
-- **Progressive Disclosure**: Expandable sections and sidebar organization
+- **Progressive Disclosure**: Stage-based workflow with contextual controls
 - **Immediate Feedback**: Real-time updates and visual confirmations
-- **Responsive Layout**: Sidebar + main content layout for desktop and mobile
+- **Responsive Layout**: Sidebar + main content layout with professional typography hierarchy
 
 ## Main Chat Interface (`app/ui/components/chat_interface.py`)
 
@@ -43,62 +44,205 @@ class ChatInterface:
 
 ### Layout Structure
 
-**Three-Column Layout:**
+**Professional Layout (20/80 Distribution):**
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ Sidebar (Context + Controls)  │  Main Chat Area             │
-├───────────────────────────────┼─────────────────────────────┤
-│ • Context Summary             │  • Chat Messages            │
-│ • Token Budget                │  • Search Results           │
-│ • Search Settings             │  • Selection Interface      │
-│ • Creation Forms              │  • Input Area               │
-└───────────────────────────────┴─────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Sidebar (20%)              │  Main Chat Area (80%)                            │
+├────────────────────────────┼───────────────────────────────────────────────────┤
+│ • Workflow Progress        │  • Conversational AI Interface                   │
+│ • Context Summary          │  • Dynamic Response Generation                   │
+│ • Token Budget Monitor     │  • Search Results with Synthesis                 │
+│ • Stage Controls           │  • Follow-up Questions                           │
+│ • Quick Actions            │  • Intent-Aware Input Area                       │
+└────────────────────────────┴───────────────────────────────────────────────────┘
+```
+
+**Table Layout (15/85 Distribution):**
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Sidebar (15%)          │  Main Data Area (85%)                               │
+├────────────────────────┼─────────────────────────────────────────────────────┤
+│ • Navigation           │  • Data Tables with Optimal Column Width            │
+│ • Filters              │  • Export and Bulk Actions                         │
+│ • Create Forms         │  • Search and Filter Results                       │
+│ • Summary Stats        │  • Pagination and Sorting Controls                  │
+└────────────────────────┴─────────────────────────────────────────────────────┘
 ```
 
 ### Sidebar Components
 
+**Workflow Progress Stepper:**
+- Vertical progress indicator for 4-stage workflow
+- Current stage highlighted with active styling
+- Completed stages marked with checkmarks
+- Upcoming stages shown in muted state
+- Space-efficient vertical layout (saves ~100px compared to horizontal)
+
+```python
+def render_workflow_stepper():
+    """Render vertical workflow progress in sidebar"""
+    stages = [
+        {"id": 1, "title": "Search & Select", "desc": "Find insights, JTBDs, and metrics"},
+        {"id": 2, "title": "Build Context", "desc": "Review and refine your selections"},
+        {"id": 3, "title": "Generate HMWs", "desc": "Create How Might We questions"},
+        {"id": 4, "title": "Explore & Chat", "desc": "Discuss and refine with AI"}
+    ]
+    
+    for stage in stages:
+        if stage["id"] == current_stage:
+            st.sidebar.markdown(f"**▶ {stage['id']}. {stage['title']}**")
+            st.sidebar.caption(f"*{stage['desc']}*")
+        elif stage["id"] < current_stage:
+            st.sidebar.markdown(f"✓ {stage['id']}. {stage['title']}")
+        else:
+            st.sidebar.markdown(f"○ {stage['id']}. {stage['title']}")
+```
+
 **Context Summary Section:**
 - Displays currently selected insights, JTBDs, and metrics
-- Real-time token count and budget visualization  
-- Quick actions: Clear All, Prepare HMW
+- Real-time token count and budget visualization with progress bars
+- Quick actions: Clear All, Export Context, Generate HMW
+- Visual indicators for context completeness
 
-**Search Settings:**
-- Similarity threshold slider (0.0 - 1.0)
-- Results per type selector (5, 10, 15, 20)
-- Content type filters (chunks, insights, JTBDs)
+**Stage-Specific Controls:**
+- Dynamic controls based on current workflow stage
+- Progressive disclosure of relevant options
+- Context-sensitive help and guidance
+- Streamlined interface reducing cognitive load
 
-**Creation Forms:**
-- Compact JTBD creation form
-- Compact metric creation form
-- Inline success/error feedback
+**Creation Forms (Contextual):**
+- Compact JTBD creation form (appears when needed)
+- Compact metric creation form (stage-appropriate)
+- Inline success/error feedback with clear messaging
+- Auto-focus and validation for better UX
 
 ### Chat Area Components
 
-**Message Types:**
+**Conversational AI Interface:**
 
 **User Messages:**
 ```python
 {
     "type": "user",
-    "content": "search for mobile checkout issues",
-    "timestamp": "2024-01-15T10:30:00Z"
+    "content": "Let's explore opportunities in mobile checkout",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "detected_intent": {
+        "type": "EXPLORATION",
+        "confidence": 0.85,
+        "needs_search": True
+    }
 }
 ```
 
-**Assistant Messages:**
+**AI Assistant Messages:**
 ```python
 {
-    "type": "assistant", 
-    "content": "Search results for: mobile checkout issues",
+    "type": "assistant",
+    "content": "I'd be happy to explore mobile checkout opportunities with you. Based on current research trends...",
     "data": {
         "success": True,
-        "results": {...},
-        "search_metadata": {...},
-        "suggestions": [...]
+        "response_type": "conversational",
+        "intent_type": "EXPLORATION",
+        "has_context": True,
+        "search_results": {...},
+        "follow_up_questions": [
+            "What specific pain points do users encounter?",
+            "How does mobile performance compare to desktop?",
+            "What metrics would indicate success?"
+        ],
+        "tokens_used": 850,
+        "model": "gpt-4"
     },
     "timestamp": "2024-01-15T10:30:15Z"
 }
 ```
+
+**Follow-Up Question Rendering:**
+```python
+def render_follow_up_questions(questions: List[str]):
+    """Render interactive follow-up questions"""
+    if questions:
+        st.markdown("**Continue the conversation:**")
+        
+        # Create columns for multiple questions
+        cols = st.columns(min(len(questions), 3))
+        
+        for i, question in enumerate(questions):
+            col_idx = i % len(cols)
+            with cols[col_idx]:
+                if st.button(question, key=f"followup_{i}", type="secondary"):
+                    # Add question to chat and process
+                    st.session_state.chat_messages.append({
+                        "type": "user",
+                        "content": question,
+                        "timestamp": datetime.now().isoformat(),
+                        "source": "follow_up"
+                    })
+                    st.rerun()
+```
+
+**Search Results Integration:**
+```python
+def render_search_results_with_context(search_results: Dict[str, List[Dict]], query: str):
+    """Render search results with conversational context"""
+    
+    if not search_results or not any(search_results.values()):
+        st.info("No specific results found. The AI response above provides general guidance.")
+        return
+    
+    with st.expander("View detailed search results", expanded=False):
+        for content_type, results in search_results.items():
+            if results:
+                st.subheader(f"{content_type.title()} ({len(results)} found)")
+                
+                for result in results:
+                    render_search_result_card(
+                        result=result,
+                        content_type=content_type,
+                        similarity_score=result.get('similarity', 0),
+                        allow_selection=True,
+                        compact=True
+                    )
+```
+
+**Intent Detection Indicators:**
+```python
+def render_intent_indicator(intent: MessageIntent):
+    """Show intent detection results to user (debug/transparency mode)"""
+    if st.session_state.get('show_debug_info', False):
+        intent_colors = {
+            "QUESTION": "🟦",
+            "SEARCH": "🟨", 
+            "EXPLORATION": "🟩",
+            "ACTION": "🟪"
+        }
+        
+        st.caption(
+            f"{intent_colors.get(intent.intent_type, '⚪')} "
+            f"Intent: {intent.intent_type} "
+            f"(Confidence: {intent.confidence:.2f})"
+        )
+```
+
+**Conversational Response Types:**
+
+**Discovery Responses** (EXPLORATION intent):
+- Creative, open-ended exploration
+- Higher temperature for diverse thinking
+- Focus on possibilities and brainstorming
+- Multiple follow-up questions to expand thinking
+
+**Expert Consultation** (QUESTION intent):
+- Authoritative, knowledgeable guidance
+- Balanced temperature for accuracy and engagement
+- JTBD framework expertise
+- Educational follow-up questions
+
+**Search Synthesis** (SEARCH intent):
+- Structured information synthesis
+- Context-aware result interpretation
+- Clear, organized presentation
+- Refinement-focused follow-ups
 
 **System Messages:**
 ```python
@@ -606,4 +750,86 @@ if is_first_visit():
     st.info("👋 Welcome! Start by searching for insights or creating your first JTBD.")
 ```
 
-This UI architecture provides a smooth, intuitive experience while maintaining the flexibility needed for complex JTBD workflow operations.
+## Professional Design Patterns
+
+### Weight Distribution Standards
+
+**Conversational Pages** (Chat Interface):
+- **Sidebar**: 20% width (280px @ 1400px viewport)
+- **Main Content**: 80% width (1120px @ 1400px viewport)
+- **Rationale**: Chat needs maximum space for conversation flow and search results
+
+**Data Table Pages** (Metrics, Insights, JTBDs):
+- **Sidebar**: 15% width (210px @ 1400px viewport)
+- **Main Content**: 85% width (1190px @ 1400px viewport)
+- **Rationale**: Tables need maximum horizontal space for columns and data
+
+### Typography Hierarchy
+
+**Implementation Standards:**
+```python
+# Page Titles
+st.title("JTBD Assistant Platform")  # 32px, bold
+
+# Section Headers
+st.header("Context Summary")  # 24px, medium
+
+# Subsections
+st.subheader("Selected Insights")  # 18px, medium
+
+# Body Text
+st.markdown("Regular content...")  # 14px, regular
+
+# Secondary Information
+st.caption("Token usage: 1,250/4,000")  # 12px, muted
+```
+
+### Professional Emoji Usage
+
+**Approved Usage** (Functional Only):
+- **Navigation**: 💬 📊 💡 🎯 (page icons)
+- **Status**: ✅ ⚠️ ❌ (system feedback)
+- **Content Types**: 📄 📈 🔍 (data categorization)
+- **Actions**: ➕ 📥 🗑️ (clear action indicators)
+
+**Prohibited Usage** (Decorative):
+- Multiple emojis per element
+- Emotional/personality emojis in content
+- Redundant emojis with text labels
+- Decorative elements in body text
+
+### Responsive Behavior
+
+**Desktop (1200px+)**:
+- Fixed sidebar widths per page type
+- Full feature set available
+- Optimal column layouts
+
+**Tablet (768-1199px)**:
+- Collapsible drawer overlay sidebar
+- Condensed but functional interface
+- Touch-optimized controls
+
+**Mobile (<768px)**:
+- Bottom navigation tabs replace sidebar
+- Single column layout for main content
+- Simplified conversation interface
+
+### Performance Optimizations
+
+**Lazy Loading**:
+- Search results loaded on demand
+- Chat history paginated for large conversations
+- Context components rendered only when visible
+
+**State Management**:
+- Efficient session state updates
+- Minimal re-rendering of stable components
+- Cached computation results where appropriate
+
+**Memory Management**:
+- Conversation history with size limits
+- Token budget monitoring and cleanup
+- Progressive loading of large datasets
+
+This UI architecture provides a sophisticated, professional conversational experience while maintaining clean separation of concerns and excellent performance characteristics for the JTBD Assistant Platform.
