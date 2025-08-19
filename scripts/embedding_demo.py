@@ -4,7 +4,7 @@ Shows how all components work together end-to-end.
 """
 
 import asyncio
-from app.core.database import db
+from app.core import db
 from app.core.llm_wrapper import initialize_llm
 from app.core.embeddings import initialize_embedding_manager
 from app.utils.text_utils import get_text_processor

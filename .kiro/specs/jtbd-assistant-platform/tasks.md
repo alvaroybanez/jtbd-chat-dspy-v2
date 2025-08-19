@@ -1,20 +1,20 @@
 # Implementation Plan
 
-- [ ] 1. Set up database schema and core infrastructure
+- [x] 1. Set up database schema and core infrastructure
   - Create Supabase database tables with proper relationships and constraints
   - Add simple vector search RPC function
   - Create LLM traces table for observability
   - Enable pgvector extension and create vector indexes
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 2. Implement document processing with caching
+- [x] 2. Implement document processing with caching
   - Create document upload handler with file size and format validation
   - Implement content chunking with overlap for vector search
   - Add cached embedding generation to reduce latency and cost
   - Build insight extraction using LLM wrapper with trace logging
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
-- [ ] 3. Build vector search and chat exploration
+- [x] 3. Build vector search and chat exploration
   - Implement vector search using Supabase RPC
   - Create chat interface for document exploration and context building
   - Add structured response display with selection buttons for insights, JTBDs, and metrics

@@ -12,6 +12,7 @@ from typing import List, Dict, Any
 from app.core.llm_wrapper import LLMWrapper, initialize_llm, get_llm
 from app.core.embeddings import EmbeddingManager, initialize_embedding_manager
 from app.utils.text_utils import TextProcessor, get_text_processor, chunk_text, count_tokens
+from app.core.exceptions import APIKeyNotFoundError
 
 
 class TestLLMWrapper:
@@ -34,7 +35,7 @@ class TestLLMWrapper:
     def test_initialization_no_api_key(self):
         """Test initialization fails without API key."""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError, match="OPENAI_API_KEY must be set"):
+            with pytest.raises(APIKeyNotFoundError, match="OPENAI_API_KEY must be set"):
                 LLMWrapper()
 
     @patch("app.core.llm_wrapper.OpenAI")
@@ -87,7 +88,7 @@ class TestLLMWrapper:
         """Test embedding generation with empty input."""
         result = self.llm_wrapper.generate_embeddings("")
         assert result["success"] is False
-        assert "No texts provided" in result["error"]
+        assert "LLM error" in result["error"]
 
     @patch("app.core.llm_wrapper.OpenAI")
     def test_generate_embeddings_api_error(self, mock_openai):

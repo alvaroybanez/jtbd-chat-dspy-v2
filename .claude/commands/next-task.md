@@ -13,8 +13,8 @@ You will work on **Task #$ARGUMENTS** following the proven Explore→Plan→Code
 **DO NOT WRITE ANY CODE IN THIS PHASE.**
 
 ### Primary exploration:
-1. Read @.kiro/specs/spec-name/tasks.md and locate Task #$ARGUMENTS - understand every requirement. There will be different specs, so technically, every spec created will have a different folder. 
-2. Read ALL files in @.kiro/docs/ folder to understand:
+1. Read @.kiro/specs/**/tasks.md and locate Task #$ARGUMENTS - understand every requirement. There will be different specs, so technically, every spec created will have a different folder. 
+2. Read ALL files in @docs/ folder to understand:
    - What has been accomplished so far
    - Reference materials and specifications
    - Dependencies and constraints
