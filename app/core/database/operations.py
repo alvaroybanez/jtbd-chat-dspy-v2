@@ -431,3 +431,47 @@ class DatabaseOperations:
 
         except Exception as e:
             return {"success": False, "error": f"Failed to get metrics: {str(e)}"}
+
+    def get_all_insights(self) -> Dict[str, Any]:
+        """Get all insights with source documents for display purposes."""
+        if not validate_client(self.client):
+            return {"success": False, "error": "Client not initialized"}
+
+        try:
+            response = (
+                self.client.table(TABLE_INSIGHTS)
+                .select("id, description, document_id, created_at, documents(id, title)")
+                .order("created_at", desc=True)
+                .execute()
+            )
+
+            return {
+                "success": True,
+                "insights": response.data or [],
+                "count": len(response.data) if response.data else 0,
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"Failed to get insights: {str(e)}"}
+
+    def get_all_jtbds(self) -> Dict[str, Any]:
+        """Get all JTBDs for display purposes."""
+        if not validate_client(self.client):
+            return {"success": False, "error": "Client not initialized"}
+
+        try:
+            response = (
+                self.client.table(TABLE_JTBDS)
+                .select("id, statement, context, outcome, created_at")
+                .order("created_at", desc=True)
+                .execute()
+            )
+
+            return {
+                "success": True,
+                "jtbds": response.data or [],
+                "count": len(response.data) if response.data else 0,
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"Failed to get JTBDs: {str(e)}"}

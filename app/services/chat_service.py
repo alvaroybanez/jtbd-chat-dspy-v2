@@ -14,6 +14,7 @@ from ..core.constants import (
 )
 from .search_service import get_search_service
 from .context_manager import get_context_manager
+from .conversation_service import get_conversation_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,40 +22,48 @@ logger = logging.getLogger(__name__)
 class ChatService:
     """Processes user queries and builds structured responses for Streamlit display."""
 
-    def __init__(self, search_service=None, context_manager=None):
+    def __init__(self, search_service=None, context_manager=None, conversation_service=None):
         """
-        Initialize chat service with search and context managers.
+        Initialize chat service with search, context, and conversation managers.
 
         Args:
             search_service: SearchService instance for query processing
             context_manager: ContextManager instance for context building
+            conversation_service: ConversationService instance for AI interactions
         """
         self.search = search_service or get_search_service()
         self.context = context_manager or get_context_manager()
+        self.conversation = conversation_service or get_conversation_service()
         
         if not self.search:
             raise ValueError("SearchService is required for ChatService")
         if not self.context:
             raise ValueError("ContextManager is required for ChatService")
+        if not self.conversation:
+            raise ValueError("ConversationService is required for ChatService")
 
     def process_message(
         self,
         query: str,
         search_types: Optional[List[str]] = None,
         similarity_threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
-        limit_per_type: int = DEFAULT_SEARCH_LIMIT
+        limit_per_type: int = DEFAULT_SEARCH_LIMIT,
+        conversation_mode: bool = True,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
-        Process a user query and return structured search results.
+        Process a user query with both search and conversational capabilities.
 
         Args:
             query: User's search query
             search_types: Types to search ('chunks', 'insights', 'jtbds') or None for all
             similarity_threshold: Minimum similarity score for results
             limit_per_type: Maximum results per content type
+            conversation_mode: Whether to include conversational AI responses
+            conversation_history: Previous conversation messages
 
         Returns:
-            Dict with processed query results and metadata
+            Dict with processed query results and conversational response
         """
         try:
             if not query or not query.strip():
@@ -65,44 +74,63 @@ class ChatService:
 
             query = query.strip()
             
-            # Search across content types
-            if search_types is None:
-                # Search all content types
-                search_result = self.search.search_all_content(
-                    query_text=query,
-                    similarity_threshold=similarity_threshold,
-                    limit_per_type=limit_per_type
+            # Step 1: Analyze intent if conversation mode is enabled
+            intent = None
+            if conversation_mode:
+                intent = self.conversation.analyze_intent(query)
+                logger.info(f"Detected intent: {intent.intent_type} (confidence: {intent.confidence:.2f})")
+            
+            # Step 2: Perform search (always do search for context)
+            search_result = None
+            if intent is None or intent.needs_search or intent.is_search:
+                if search_types is None:
+                    # Search all content types
+                    search_result = self.search.search_all_content(
+                        query_text=query,
+                        similarity_threshold=similarity_threshold,
+                        limit_per_type=limit_per_type
+                    )
+                else:
+                    # Search specific types
+                    search_result = self._search_specific_types(
+                        query=query,
+                        search_types=search_types,
+                        similarity_threshold=similarity_threshold,
+                        limit_per_type=limit_per_type
+                    )
+
+                if not search_result["success"]:
+                    logger.warning(f"Search failed: {search_result.get('error')}")
+                    search_result = {"success": True, "results": {}, "total_found": 0}
+
+            # Step 3: Format search results
+            formatted_results = {}
+            if search_result and search_result["success"]:
+                formatted_results = self.format_search_results(search_result["results"])
+
+            # Step 4: Generate conversational response if enabled
+            conversation_response = None
+            if conversation_mode and intent:
+                conversation_response = self.conversation.generate_conversational_response(
+                    message=query,
+                    intent=intent,
+                    search_results=search_result.get("results") if search_result else None,
+                    conversation_history=conversation_history
                 )
-            else:
-                # Search specific types
-                search_result = self._search_specific_types(
-                    query=query,
-                    search_types=search_types,
-                    similarity_threshold=similarity_threshold,
-                    limit_per_type=limit_per_type
-                )
 
-            if not search_result["success"]:
-                return {
-                    "success": False,
-                    "error": f"Search failed: {search_result.get('error')}"
-                }
-
-            # Format results for Streamlit display
-            formatted_results = self.format_search_results(search_result["results"])
-
-            # Get current context status
+            # Step 5: Get current context status
             context_summary = self.context.get_context_summary()
             token_budget = self.context.check_token_budget()
 
-            return {
+            # Step 6: Build comprehensive response
+            response = {
                 "success": True,
                 "query": query,
                 "timestamp": datetime.now().isoformat(),
                 "search_metadata": {
-                    "total_found": search_result.get("total_found", 0),
+                    "total_found": search_result.get("total_found", 0) if search_result else 0,
                     "similarity_threshold": similarity_threshold,
-                    "from_cache": search_result.get("from_cache", False),
+                    "from_cache": search_result.get("from_cache", False) if search_result else False,
                     "search_types": search_types or ["chunks", "insights", "jtbds"]
                 },
                 "results": formatted_results,
@@ -112,6 +140,31 @@ class ChatService:
                 },
                 "suggestions": self._generate_suggestions(formatted_results, context_summary)
             }
+
+            # Add conversational response if available
+            if conversation_response and conversation_response.get("success"):
+                response.update({
+                    "conversation": {
+                        "enabled": True,
+                        "response": conversation_response["content"],
+                        "response_type": conversation_response.get("response_type"),
+                        "intent_type": conversation_response.get("intent_type"),
+                        "follow_up_questions": conversation_response.get("follow_up_questions", []),
+                        "has_context": conversation_response.get("has_context", False),
+                        "tokens_used": conversation_response.get("tokens_used"),
+                        "model": conversation_response.get("model")
+                    }
+                })
+            else:
+                response.update({
+                    "conversation": {
+                        "enabled": conversation_mode,
+                        "response": None,
+                        "error": conversation_response.get("error") if conversation_response else None
+                    }
+                })
+
+            return response
 
         except Exception as e:
             logger.error(f"Failed to process message: {e}")
@@ -507,10 +560,10 @@ class ChatService:
 chat_service = None
 
 
-def initialize_chat_service(search_service=None, context_manager=None) -> ChatService:
+def initialize_chat_service(search_service=None, context_manager=None, conversation_service=None) -> ChatService:
     """Initialize global chat service instance."""
     global chat_service
-    chat_service = ChatService(search_service, context_manager)
+    chat_service = ChatService(search_service, context_manager, conversation_service)
     return chat_service
 
 

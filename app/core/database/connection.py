@@ -42,7 +42,9 @@ class DatabaseManager:
 
     def __init__(self):
         self.client: Optional[Client] = None
+        self.ops: Optional['DatabaseOperations'] = None
         self._initialize_client()
+        self._initialize_ops()
 
     def _get_environment_variable(self, primary_name: str, alternatives: list) -> Optional[str]:
         """Get environment variable value trying primary name first, then alternatives."""
@@ -78,6 +80,12 @@ class DatabaseManager:
             self.client = create_client(url, key)
         except Exception as e:
             raise ConnectionError(f"Failed to create Supabase client: {e}")
+
+    def _initialize_ops(self):
+        """Initialize DatabaseOperations module for backward compatibility."""
+        if self.client:
+            from .operations import DatabaseOperations
+            self.ops = DatabaseOperations(self.client)
 
     def test_connection(self) -> Dict[str, Any]:
         """
@@ -294,12 +302,79 @@ class DatabaseManager:
         similarity_threshold: float = 0.7,
     ) -> Dict[str, Any]:
         """Search for similar document chunks using vector similarity."""
+        if self.ops:
+            return self.ops.search_similar_chunks(query_embedding, limit, similarity_threshold)
+        
         if not self.client:
             return {"success": False, "error": "Client not initialized"}
             
         try:
             response = self.client.rpc(
                 RPC_SEARCH_CHUNKS,
+                {
+                    "query_embedding": query_embedding,
+                    "match_count": limit,
+                    "similarity_threshold": similarity_threshold,
+                },
+            ).execute()
+            
+            return {
+                "success": True,
+                "results": response.data or [],
+                "count": len(response.data) if response.data else 0,
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": f"Search failed: {str(e)}"}
+
+    def search_similar_insights(
+        self,
+        query_embedding: List[float],
+        limit: int = 10,
+        similarity_threshold: float = 0.7,
+    ) -> Dict[str, Any]:
+        """Search for similar insights using vector similarity."""
+        if self.ops:
+            return self.ops.search_similar_insights(query_embedding, limit, similarity_threshold)
+        
+        if not self.client:
+            return {"success": False, "error": "Client not initialized"}
+            
+        try:
+            response = self.client.rpc(
+                "search_insights",
+                {
+                    "query_embedding": query_embedding,
+                    "match_count": limit,
+                    "similarity_threshold": similarity_threshold,
+                },
+            ).execute()
+            
+            return {
+                "success": True,
+                "results": response.data or [],
+                "count": len(response.data) if response.data else 0,
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": f"Search failed: {str(e)}"}
+
+    def search_similar_jtbds(
+        self,
+        query_embedding: List[float],
+        limit: int = 10,
+        similarity_threshold: float = 0.7,
+    ) -> Dict[str, Any]:
+        """Search for similar JTBDs using vector similarity."""
+        if self.ops:
+            return self.ops.search_similar_jtbds(query_embedding, limit, similarity_threshold)
+        
+        if not self.client:
+            return {"success": False, "error": "Client not initialized"}
+            
+        try:
+            response = self.client.rpc(
+                "search_jtbds",
                 {
                     "query_embedding": query_embedding,
                     "match_count": limit,

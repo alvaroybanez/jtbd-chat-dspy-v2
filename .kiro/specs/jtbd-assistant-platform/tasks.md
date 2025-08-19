@@ -28,34 +28,44 @@
   - Ensure created items are available for chat exploration and selection
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 5. Implement HMW generation with fallback
+- [ ] 5. Create multi-page Streamlit application structure
+  - Convert single-page app to multi-page using st.Page and st.navigation
+  - Move existing chat interface to dedicated page as home/default
+  - Create table view page for all metrics with current/target values and units
+  - Create table view page for all insights with source documents and timestamps
+  - Create table view page for all JTBDs with statements, context, and outcomes
+  - Add data retrieval methods to fetch all records from database
+  - Implement proper navigation with icons and clear page titles
+  - _Requirements: UI organization and data visualization_
+
+- [ ] 6. Implement HMW generation with fallback
   - Create HMW generation function using LLM wrapper with trace logging
   - Add optional DSPy integration with graceful fallback to OpenAI
   - Implement context-based prompt building from selected insights, JTBDs, and metrics
   - Store generated HMWs with relationship tracking to source context
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
-- [ ] 6. Build solution creation with intelligent metric assignment
+- [ ] 7. Build solution creation with intelligent metric assignment
   - Implement solution generation from selected HMWs using LLM wrapper
   - Add per-session metric fallback instead of global default
   - Create solution scoring algorithm (Impact × 0.6 + (10 - Effort) × 0.4)
   - Store solutions with relationship tracking and automatic sorting by score
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-- [ ] 7. Add error handling and guardrails
+- [ ] 8. Add error handling and guardrails
   - Implement structured error responses with retry/fallback actions
   - Add token budget enforcement with text truncation utilities
   - Create graceful fallback for DSPy unavailability
   - Add file size validation and format checking with appropriate error messages
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 8. Implement basic session management
+- [ ] 9. Implement basic session management
   - Create Streamlit session state management for user context
   - Add basic data persistence and retrieval
   - Implement simple session initialization
   - _Requirements: 3.1, 3.4, 3.5_
 
-- [ ] 9. Create main Streamlit application
+- [ ] 10. Create main Streamlit application
   - Build main UI with sidebar for uploads and manual input
   - Implement chat interface with message history and structured responses
   - Add session state management and context building
@@ -63,7 +73,7 @@
   - Wire together all components into cohesive user experience
   - _Requirements: 3.1, 3.4, 3.5, 3.6, 3.7, 3.8_
 
-- [ ] 10. Add configuration and deployment setup
+- [ ] 11. Add configuration and deployment setup
   - Create Streamlit secrets configuration template
   - Add environment variable setup for API keys
   - Implement client initialization with proper error handling

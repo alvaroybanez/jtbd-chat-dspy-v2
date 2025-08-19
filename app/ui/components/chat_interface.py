@@ -92,6 +92,14 @@ class ChatInterface:
         else:
             st.error("Context manager not available")
         
+        # Conversation settings
+        st.header("Conversation Settings")
+        conversation_enabled = st.toggle(
+            "💬 Conversational AI",
+            value=True,
+            help="Enable AI-powered conversational responses alongside search results"
+        )
+        
         # Search settings
         st.header("Search Settings")
         similarity_threshold = st.slider(
@@ -114,6 +122,9 @@ class ChatInterface:
         st.session_state.search_settings = {
             "similarity_threshold": similarity_threshold,
             "results_per_type": results_per_type
+        }
+        st.session_state.conversation_settings = {
+            "enabled": conversation_enabled
         }
         
         # Manual creation forms
@@ -165,7 +176,7 @@ class ChatInterface:
                 self._render_chat_message(message)
     
     def _render_chat_message(self, message: Dict[str, Any]) -> None:
-        """Render individual chat message with search results."""
+        """Render individual chat message with search results and conversational responses."""
         message_type = message.get("type", "user")
         
         if message_type == "user":
@@ -174,23 +185,29 @@ class ChatInterface:
                 
         elif message_type == "assistant":
             with st.chat_message("assistant"):
-                # Show query and metadata
                 query_data = message.get("data", {})
                 
                 if query_data.get("success"):
-                    # Search metadata
-                    metadata = query_data.get("search_metadata", {})
-                    st.caption(
-                        f"Found {metadata.get('total_found', 0)} results "
-                        f"(threshold: {metadata.get('similarity_threshold', 0):.2f})"
-                    )
+                    # Show conversational response first if available
+                    conversation = query_data.get("conversation", {})
+                    if conversation.get("enabled") and conversation.get("response"):
+                        self._render_conversational_response(conversation)
                     
-                    # Render search results with selection buttons
-                    results = query_data.get("results", {})
-                    if results:
-                        self._render_search_results(results, message.get("timestamp"))
-                    else:
-                        st.info("No results found. Try different search terms or lower the similarity threshold.")
+                    # Then show search metadata and results
+                    metadata = query_data.get("search_metadata", {})
+                    total_found = metadata.get("total_found", 0)
+                    
+                    if total_found > 0:
+                        st.caption(
+                            f"Found {total_found} results "
+                            f"(threshold: {metadata.get('similarity_threshold', 0):.2f})"
+                        )
+                        
+                        # Render search results with selection buttons
+                        results = query_data.get("results", {})
+                        if results:
+                            with st.expander("📊 Search Results", expanded=False):
+                                self._render_search_results(results, message.get("timestamp"))
                     
                     # Show suggestions
                     suggestions = query_data.get("suggestions", [])
@@ -198,11 +215,59 @@ class ChatInterface:
                         render_suggestions_section(suggestions)
                         
                 else:
-                    st.error(f"Search failed: {query_data.get('error', 'Unknown error')}")
+                    st.error(f"Query failed: {query_data.get('error', 'Unknown error')}")
         
         elif message_type == "system":
             with st.chat_message("assistant"):
                 st.info(message.get("content", ""))
+    
+    def _render_conversational_response(self, conversation: Dict[str, Any]) -> None:
+        """Render conversational AI response with follow-up questions."""
+        # Main AI response
+        response_text = conversation.get("response", "")
+        if response_text:
+            st.markdown(response_text)
+        
+        # Show response metadata
+        response_type = conversation.get("response_type", "")
+        intent_type = conversation.get("intent_type", "")
+        
+        if response_type or intent_type:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if intent_type:
+                    st.caption(f"🎯 Intent: {intent_type}")
+            with col2:
+                if response_type:
+                    st.caption(f"💭 Type: {response_type.replace('_', ' ').title()}")
+            with col3:
+                if conversation.get("has_context"):
+                    st.caption("📚 Enhanced with research data")
+        
+        # Follow-up questions
+        follow_ups = conversation.get("follow_up_questions", [])
+        if follow_ups:
+            st.markdown("**💡 Continue exploring:**")
+            for i, question in enumerate(follow_ups[:3]):  # Limit to 3 questions
+                if st.button(f"❓ {question}", key=f"followup_{i}_{id(conversation)}"):
+                    # Add follow-up question as user message and process it
+                    self._process_follow_up_question(question)
+    
+    def _process_follow_up_question(self, question: str) -> None:
+        """Process a follow-up question by adding it to chat and processing."""
+        # Add user message
+        user_message = {
+            "type": "user",
+            "content": question,
+            "timestamp": datetime.now().isoformat()
+        }
+        st.session_state.chat_messages.append(user_message)
+        
+        # Process the question
+        self._process_user_query(question, ["chunks", "insights", "jtbds"])
+        
+        # Refresh the page to show the new interaction
+        st.rerun()
     
     def _render_search_results(self, results: Dict[str, List[Dict[str, Any]]], message_timestamp: str) -> None:
         """Render search results with selection buttons."""
@@ -256,11 +321,11 @@ class ChatInterface:
                     st.metric("Selected Items", total_selected)
         
         # Chat input
-        if query := st.chat_input("Search for insights, JTBDs, or ask questions..."):
+        if query := st.chat_input("Ask questions or search for insights, JTBDs, and metrics..."):
             self._process_user_query(query, search_types)
     
     def _process_user_query(self, query: str, search_types: List[str]) -> None:
-        """Process user query and display results."""
+        """Process user query and display results with conversational capabilities."""
         if not query.strip():
             return
         
@@ -272,22 +337,36 @@ class ChatInterface:
         }
         st.session_state.chat_messages.append(user_message)
         
-        # Process query with search settings
+        # Build conversation history for context
+        conversation_history = []
+        for msg in st.session_state.chat_messages[-10:]:  # Last 10 messages
+            if msg.get("type") == "user":
+                conversation_history.append({"role": "user", "content": msg["content"]})
+            elif msg.get("type") == "assistant":
+                conversation_data = msg.get("data", {}).get("conversation", {})
+                if conversation_data.get("response"):
+                    conversation_history.append({"role": "assistant", "content": conversation_data["response"]})
+        
+        # Process query with search and conversation settings
         search_settings = st.session_state.get("search_settings", {})
+        conversation_settings = st.session_state.get("conversation_settings", {"enabled": True})
         
         if self.chat_service:
-            with st.spinner("Searching..."):
+            spinner_text = "Thinking and searching..." if conversation_settings.get("enabled") else "Searching..."
+            with st.spinner(spinner_text):
                 result = self.chat_service.process_message(
                     query=query,
                     search_types=search_types if search_types else None,
                     similarity_threshold=search_settings.get("similarity_threshold", DEFAULT_SIMILARITY_THRESHOLD),
-                    limit_per_type=search_settings.get("results_per_type", DEFAULT_SEARCH_LIMIT)
+                    limit_per_type=search_settings.get("results_per_type", DEFAULT_SEARCH_LIMIT),
+                    conversation_mode=conversation_settings.get("enabled", True),
+                    conversation_history=conversation_history[-6:] if conversation_history else None  # Last 6 messages
                 )
             
             # Add assistant response to chat
             assistant_message = {
                 "type": "assistant",
-                "content": f"Search results for: {query}",
+                "content": f"Response to: {query}",
                 "data": result,
                 "timestamp": datetime.now().isoformat()
             }

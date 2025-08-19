@@ -3,6 +3,10 @@ JTBD Assistant Platform - Main Streamlit Application
 
 Single-user AI-powered application that transforms customer research into actionable insights,
 How Might We (HMW) questions, and prioritized solutions through a conversational chat interface.
+
+Multi-page structure with:
+- Chat interface for exploration and conversation
+- Table views for metrics, insights, and JTBDs
 """
 
 import streamlit as st
@@ -10,7 +14,7 @@ import logging
 from typing import Optional
 
 from app.services.initialization import initialize_all_services
-from app.ui.components import render_chat_interface, clear_chat_history, export_chat_history
+from app.pages import chat, metrics, insights, jtbds
 
 # Configure logging
 logging.basicConfig(
@@ -50,30 +54,8 @@ def initialize_app() -> bool:
 
 
 def render_app_header() -> None:
-    """Render the application header with navigation and controls."""
-    col1, col2, col3 = st.columns([3, 1, 1])
-    
-    with col1:
-        st.markdown(
-            "**Transform customer research into actionable insights and solutions**"
-        )
-    
-    with col2:
-        if st.button("📥 Export Chat", help="Export chat history"):
-            exported_text = export_chat_history()
-            if exported_text:
-                st.download_button(
-                    label="Download Chat History",
-                    data=exported_text,
-                    file_name=f"jtbd_chat_history.txt",
-                    mime="text/plain"
-                )
-            else:
-                st.info("No chat history to export")
-    
-    with col3:
-        if st.button("🗑️ Clear Chat", help="Clear chat history"):
-            clear_chat_history()
+    """Render the application header."""
+    st.markdown("**Transform customer research into actionable insights and solutions**")
 
 
 def render_error_state(error_message: str) -> None:
@@ -114,7 +96,7 @@ def render_error_state(error_message: str) -> None:
 
 
 def main():
-    """Main Streamlit application entry point."""
+    """Main Streamlit application entry point with multi-page navigation."""
     # Configure Streamlit page
     st.set_page_config(
         page_title="JTBD Assistant Platform",
@@ -123,35 +105,33 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Application header
-    st.title("🎯 JTBD Assistant Platform")
-    render_app_header()
-    
-    # Initialize application
+    # Initialize application services first
     if not initialize_app():
         render_error_state("Failed to initialize application services")
         return
     
-    # Render main chat interface
+    # Define pages for navigation
+    pages = [
+        st.Page(chat.chat_page, title="Chat Assistant", icon="💬", default=True),
+        st.Page(metrics.metrics_page, title="Metrics", icon="📊"),
+        st.Page(insights.insights_page, title="Insights", icon="💡"),
+        st.Page(jtbds.jtbds_page, title="Jobs to be Done", icon="🎯"),
+    ]
+    
+    # Create navigation
     try:
-        render_chat_interface()
+        pg = st.navigation(pages)
+        
+        # Application header
+        st.title("🎯 JTBD Assistant Platform")
+        render_app_header()
+        
+        # Run the selected page
+        pg.run()
         
     except Exception as e:
-        logger.error(f"Failed to render chat interface: {e}")
-        render_error_state(f"Chat interface error: {str(e)}")
-    
-    # Footer
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.caption("💡 **Tip:** Search for insights and JTBDs to build context for HMW generation")
-    
-    with col2:
-        st.caption("📊 **Budget:** Monitor token usage in the sidebar")
-    
-    with col3:
-        st.caption("🎯 **Goal:** Generate actionable How Might We questions")
+        logger.error(f"Failed to render application: {e}")
+        render_error_state(f"Application error: {str(e)}")
 
 
 if __name__ == "__main__":

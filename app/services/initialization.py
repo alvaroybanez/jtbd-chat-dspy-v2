@@ -13,6 +13,7 @@ from ..core.llm_wrapper import get_llm
 from .search_service import initialize_search_service
 from .context_manager import initialize_context_manager
 from .chat_service import initialize_chat_service
+from .conversation_service import initialize_conversation_service
 from .jtbd_service import initialize_jtbd_service
 from .metric_service import initialize_metric_service
 
@@ -102,7 +103,22 @@ def initialize_all_services(
                 "error": f"Failed to initialize context manager: {str(e)}"
             }
 
-        # 3. Initialize JTBD service (requires db + embeddings)
+        # 3. Initialize conversation service (requires llm)
+        try:
+            conversation_service = initialize_conversation_service(
+                llm_wrapper=llm
+            )
+            results["conversation_service"] = {
+                "success": True,
+                "instance": conversation_service
+            }
+        except Exception as e:
+            results["conversation_service"] = {
+                "success": False,
+                "error": f"Failed to initialize conversation service: {str(e)}"
+            }
+
+        # 4. Initialize JTBD service (requires db + embeddings)
         try:
             jtbd_service = initialize_jtbd_service(
                 database_manager=db,
@@ -118,7 +134,7 @@ def initialize_all_services(
                 "error": f"Failed to initialize JTBD service: {str(e)}"
             }
 
-        # 4. Initialize metric service (requires db)
+        # 5. Initialize metric service (requires db)
         try:
             metric_service = initialize_metric_service(
                 database_manager=db
@@ -133,12 +149,15 @@ def initialize_all_services(
                 "error": f"Failed to initialize metric service: {str(e)}"
             }
 
-        # 5. Initialize chat service (requires search + context)
+        # 6. Initialize chat service (requires search + context + conversation)
         try:
-            if results["search_service"]["success"] and results["context_manager"]["success"]:
+            if (results["search_service"]["success"] and 
+                results["context_manager"]["success"] and 
+                results["conversation_service"]["success"]):
                 chat_service = initialize_chat_service(
                     search_service=results["search_service"]["instance"],
-                    context_manager=results["context_manager"]["instance"]
+                    context_manager=results["context_manager"]["instance"],
+                    conversation_service=results["conversation_service"]["instance"]
                 )
                 results["chat_service"] = {
                     "success": True,
@@ -147,7 +166,7 @@ def initialize_all_services(
             else:
                 results["chat_service"] = {
                     "success": False,
-                    "error": "Chat service requires search service and context manager"
+                    "error": "Chat service requires search service, context manager, and conversation service"
                 }
         except Exception as e:
             results["chat_service"] = {
@@ -190,6 +209,7 @@ def check_service_health() -> Dict[str, Any]:
     """
     from .search_service import get_search_service
     from .context_manager import get_context_manager
+    from .conversation_service import get_conversation_service
     from .chat_service import get_chat_service
     from .jtbd_service import get_jtbd_service
     from .metric_service import get_metric_service
@@ -244,16 +264,42 @@ def check_service_health() -> Dict[str, Any]:
             "status": "not_initialized"
         }
 
+    # Check conversation service
+    conversation_service = get_conversation_service()
+    if conversation_service:
+        try:
+            # Test basic functionality
+            if conversation_service.llm:
+                health_status["conversation_service"] = {
+                    "status": "healthy",
+                    "llm_wrapper_available": True
+                }
+            else:
+                health_status["conversation_service"] = {
+                    "status": "unhealthy",
+                    "error": "Missing LLM wrapper dependency"
+                }
+        except Exception as e:
+            health_status["conversation_service"] = {
+                "status": "unhealthy",
+                "error": str(e)
+            }
+    else:
+        health_status["conversation_service"] = {
+            "status": "not_initialized"
+        }
+
     # Check chat service
     chat_service = get_chat_service()
     if chat_service:
         try:
             # Test basic functionality
-            if chat_service.search and chat_service.context:
+            if chat_service.search and chat_service.context and chat_service.conversation:
                 health_status["chat_service"] = {
                     "status": "healthy",
                     "search_service_available": True,
-                    "context_manager_available": True
+                    "context_manager_available": True,
+                    "conversation_service_available": True
                 }
             else:
                 health_status["chat_service"] = {
