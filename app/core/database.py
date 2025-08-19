@@ -158,6 +158,37 @@ class DatabaseManager(NewDatabaseManager):
                 return {"success": False, "error": "Client not initialized"}
         return self.ops.search_similar_jtbds(query_embedding, limit, similarity_threshold)
 
+    def create_jtbd(
+        self, statement: str, context: str = None, outcome: str = None, embedding: List[float] = None
+    ) -> Dict[str, Any]:
+        """DEPRECATED: Use DatabaseOperations.create_jtbd instead."""
+        if not hasattr(self, 'ops') or not self.ops:
+            if self.client:
+                self.ops = DatabaseOperations(self.client)
+            else:
+                return {"success": False, "error": "Client not initialized"}
+        return self.ops.create_jtbd(statement, context, outcome, embedding)
+
+    def create_metric(
+        self, name: str, current_value: float = None, target_value: float = None, unit: str = None
+    ) -> Dict[str, Any]:
+        """DEPRECATED: Use DatabaseOperations.create_metric instead."""
+        if not hasattr(self, 'ops') or not self.ops:
+            if self.client:
+                self.ops = DatabaseOperations(self.client)
+            else:
+                return {"success": False, "error": "Client not initialized"}
+        return self.ops.create_metric(name, current_value, target_value, unit)
+
+    def get_all_metrics(self) -> Dict[str, Any]:
+        """DEPRECATED: Use DatabaseOperations.get_all_metrics instead."""
+        if not hasattr(self, 'ops') or not self.ops:
+            if self.client:
+                self.ops = DatabaseOperations(self.client)
+            else:
+                return {"success": False, "error": "Client not initialized"}
+        return self.ops.get_all_metrics()
+
 
 # Global database manager instance for backward compatibility
 db = DatabaseManager()

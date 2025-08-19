@@ -11,6 +11,8 @@ from datetime import datetime
 from ...services.chat_service import get_chat_service
 from ...services.search_service import get_search_service  
 from ...services.context_manager import get_context_manager
+from ...services.jtbd_service import get_jtbd_service
+from ...services.metric_service import get_metric_service
 from ...core.constants import DEFAULT_SIMILARITY_THRESHOLD, DEFAULT_SEARCH_LIMIT
 from .selection_components import (
     render_search_result_card,
@@ -18,6 +20,8 @@ from .selection_components import (
     render_token_budget_indicator,
     render_suggestions_section
 )
+from .jtbd_form import render_compact_jtbd_form
+from .metric_form import render_compact_metric_form
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +34,8 @@ class ChatInterface:
         self.chat_service = get_chat_service()
         self.search_service = get_search_service()
         self.context_manager = get_context_manager()
+        self.jtbd_service = get_jtbd_service()
+        self.metric_service = get_metric_service()
         
         # Initialize session state for chat history
         if "chat_messages" not in st.session_state:
@@ -109,6 +115,44 @@ class ChatInterface:
             "similarity_threshold": similarity_threshold,
             "results_per_type": results_per_type
         }
+        
+        # Manual creation forms
+        st.header("Create Items")
+        st.caption("Manually create JTBDs and metrics")
+        
+        # JTBD creation form
+        if self.jtbd_service:
+            jtbd_result = render_compact_jtbd_form(
+                jtbd_service=self.jtbd_service,
+                key_prefix="sidebar_jtbd"
+            )
+            if jtbd_result and jtbd_result.get("success"):
+                # Add system message about successful creation
+                system_message = {
+                    "type": "system",
+                    "content": f"✅ JTBD created: {jtbd_result.get('jtbd', {}).get('statement', 'New JTBD')[:50]}...",
+                    "timestamp": datetime.now().isoformat()
+                }
+                st.session_state.chat_messages.append(system_message)
+        else:
+            st.warning("JTBD service not available")
+        
+        # Metric creation form
+        if self.metric_service:
+            metric_result = render_compact_metric_form(
+                metric_service=self.metric_service,
+                key_prefix="sidebar_metric"
+            )
+            if metric_result and metric_result.get("success"):
+                # Add system message about successful creation
+                system_message = {
+                    "type": "system",
+                    "content": f"📊 Metric created: {metric_result.get('metric', {}).get('name', 'New Metric')}",
+                    "timestamp": datetime.now().isoformat()
+                }
+                st.session_state.chat_messages.append(system_message)
+        else:
+            st.warning("Metric service not available")
     
     def _render_chat_area(self) -> None:
         """Render the main chat message area."""

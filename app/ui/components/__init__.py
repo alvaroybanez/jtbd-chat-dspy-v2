@@ -12,6 +12,17 @@ from .selection_components import (
     render_search_stats,
     render_hmw_readiness_indicator
 )
+from .jtbd_form import (
+    render_jtbd_creation_form,
+    render_jtbd_form_modal,
+    render_compact_jtbd_form
+)
+from .metric_form import (
+    render_metric_creation_form,
+    render_metric_form_modal,
+    render_compact_metric_form,
+    render_metric_progress_card
+)
 
 __all__ = [
     # Main chat interface
@@ -27,5 +38,16 @@ __all__ = [
     "render_suggestions_section",
     "render_content_type_filter",
     "render_search_stats",
-    "render_hmw_readiness_indicator"
+    "render_hmw_readiness_indicator",
+    
+    # JTBD form components
+    "render_jtbd_creation_form",
+    "render_jtbd_form_modal",
+    "render_compact_jtbd_form",
+    
+    # Metric form components
+    "render_metric_creation_form",
+    "render_metric_form_modal", 
+    "render_compact_metric_form",
+    "render_metric_progress_card"
 ]

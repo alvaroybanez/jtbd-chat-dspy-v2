@@ -345,3 +345,89 @@ class DatabaseOperations:
 
         except Exception as e:
             return {"success": False, "error": f"Failed to get JTBDs: {str(e)}"}
+
+    def create_jtbd(
+        self, statement: str, context: str = None, outcome: str = None, embedding: List[float] = None
+    ) -> Dict[str, Any]:
+        """Create a single JTBD with optional embedding."""
+        if not validate_client(self.client):
+            return {"success": False, "error": "Client not initialized"}
+
+        if not statement or not statement.strip():
+            return {"success": False, "error": "Statement is required"}
+
+        if embedding and not validate_embedding_dimension(embedding):
+            return {
+                "success": False,
+                "error": f"Invalid embedding dimension: {len(embedding)}",
+            }
+
+        try:
+            jtbd_data = {
+                "statement": statement.strip(),
+                "context": context.strip() if context else None,
+                "outcome": outcome.strip() if outcome else None,
+            }
+            
+            if embedding:
+                jtbd_data["embedding"] = embedding
+
+            response = self.client.table(TABLE_JTBDS).insert(jtbd_data).execute()
+
+            if response.data:
+                return {"success": True, "jtbd": response.data[0]}
+            else:
+                return {"success": False, "error": "No data returned from insert"}
+
+        except Exception as e:
+            return {"success": False, "error": f"Failed to create JTBD: {str(e)}"}
+
+    def create_metric(
+        self, name: str, current_value: float = None, target_value: float = None, unit: str = None
+    ) -> Dict[str, Any]:
+        """Create a single metric."""
+        if not validate_client(self.client):
+            return {"success": False, "error": "Client not initialized"}
+
+        if not name or not name.strip():
+            return {"success": False, "error": "Name is required"}
+
+        try:
+            metric_data = {
+                "name": name.strip(),
+                "current_value": current_value,
+                "target_value": target_value,
+                "unit": unit.strip() if unit else None,
+            }
+
+            response = self.client.table("metrics").insert(metric_data).execute()
+
+            if response.data:
+                return {"success": True, "metric": response.data[0]}
+            else:
+                return {"success": False, "error": "No data returned from insert"}
+
+        except Exception as e:
+            return {"success": False, "error": f"Failed to create metric: {str(e)}"}
+
+    def get_all_metrics(self) -> Dict[str, Any]:
+        """Get all metrics for selection purposes."""
+        if not validate_client(self.client):
+            return {"success": False, "error": "Client not initialized"}
+
+        try:
+            response = (
+                self.client.table("metrics")
+                .select("id, name, current_value, target_value, unit, created_at")
+                .order("created_at", desc=True)
+                .execute()
+            )
+
+            return {
+                "success": True,
+                "metrics": response.data or [],
+                "count": len(response.data) if response.data else 0,
+            }
+
+        except Exception as e:
+            return {"success": False, "error": f"Failed to get metrics: {str(e)}"}

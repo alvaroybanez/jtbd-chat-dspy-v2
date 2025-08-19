@@ -13,6 +13,8 @@ from ..core.llm_wrapper import get_llm
 from .search_service import initialize_search_service
 from .context_manager import initialize_context_manager
 from .chat_service import initialize_chat_service
+from .jtbd_service import initialize_jtbd_service
+from .metric_service import initialize_metric_service
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +102,38 @@ def initialize_all_services(
                 "error": f"Failed to initialize context manager: {str(e)}"
             }
 
-        # 3. Initialize chat service (requires search + context)
+        # 3. Initialize JTBD service (requires db + embeddings)
+        try:
+            jtbd_service = initialize_jtbd_service(
+                database_manager=db,
+                embedding_manager=embeddings
+            )
+            results["jtbd_service"] = {
+                "success": True,
+                "instance": jtbd_service
+            }
+        except Exception as e:
+            results["jtbd_service"] = {
+                "success": False,
+                "error": f"Failed to initialize JTBD service: {str(e)}"
+            }
+
+        # 4. Initialize metric service (requires db)
+        try:
+            metric_service = initialize_metric_service(
+                database_manager=db
+            )
+            results["metric_service"] = {
+                "success": True,
+                "instance": metric_service
+            }
+        except Exception as e:
+            results["metric_service"] = {
+                "success": False,
+                "error": f"Failed to initialize metric service: {str(e)}"
+            }
+
+        # 5. Initialize chat service (requires search + context)
         try:
             if results["search_service"]["success"] and results["context_manager"]["success"]:
                 chat_service = initialize_chat_service(
@@ -158,6 +191,8 @@ def check_service_health() -> Dict[str, Any]:
     from .search_service import get_search_service
     from .context_manager import get_context_manager
     from .chat_service import get_chat_service
+    from .jtbd_service import get_jtbd_service
+    from .metric_service import get_metric_service
 
     health_status = {}
 
@@ -232,6 +267,55 @@ def check_service_health() -> Dict[str, Any]:
             }
     else:
         health_status["chat_service"] = {
+            "status": "not_initialized"
+        }
+
+    # Check JTBD service
+    jtbd_service = get_jtbd_service()
+    if jtbd_service:
+        try:
+            if jtbd_service.db and jtbd_service.embeddings:
+                health_status["jtbd_service"] = {
+                    "status": "healthy",
+                    "database_connected": jtbd_service.db.client is not None,
+                    "embeddings_available": jtbd_service.embeddings.llm is not None
+                }
+            else:
+                health_status["jtbd_service"] = {
+                    "status": "unhealthy",
+                    "error": "Missing required dependencies"
+                }
+        except Exception as e:
+            health_status["jtbd_service"] = {
+                "status": "unhealthy",
+                "error": str(e)
+            }
+    else:
+        health_status["jtbd_service"] = {
+            "status": "not_initialized"
+        }
+
+    # Check metric service
+    metric_service = get_metric_service()
+    if metric_service:
+        try:
+            if metric_service.db:
+                health_status["metric_service"] = {
+                    "status": "healthy",
+                    "database_connected": metric_service.db.client is not None
+                }
+            else:
+                health_status["metric_service"] = {
+                    "status": "unhealthy",
+                    "error": "Missing database dependency"
+                }
+        except Exception as e:
+            health_status["metric_service"] = {
+                "status": "unhealthy",
+                "error": str(e)
+            }
+    else:
+        health_status["metric_service"] = {
             "status": "not_initialized"
         }
 
