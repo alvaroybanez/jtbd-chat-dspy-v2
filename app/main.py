@@ -105,6 +105,38 @@ def main():
         initial_sidebar_state="expanded"
     )
     
+    # Force sidebar width reduction with more aggressive CSS targeting
+    st.markdown("""
+    <style>
+    /* Force narrow sidebar width with multiple selectors */
+    .css-1d391kg, .css-1lcbmhc, .css-1outpf7, .css-17eq0hr,
+    .css-1r6slb0, .css-1cypcdb, .css-12oz5g7, [data-testid="stSidebar"] {
+        width: 240px !important;
+        min-width: 240px !important;
+        max-width: 240px !important;
+        flex: 0 0 240px !important;
+    }
+    
+    /* Adjust main content area */
+    .css-18e3th9, .css-1n76uvr, .css-6qob1r, [data-testid="stAppViewContainer"] > .main {
+        margin-left: 240px !important;
+        padding-left: 1rem !important;
+        width: calc(100vw - 240px) !important;
+    }
+    
+    /* Compact workflow stepper */
+    .stColumns > div[data-testid="column"] {
+        padding: 0.2rem !important;
+        margin: 0.1rem !important;
+    }
+    
+    /* Reduce sidebar padding */
+    .css-1d391kg .block-container {
+        padding: 0.5rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Initialize application services first
     if not initialize_app():
         render_error_state("Failed to initialize application services")
@@ -118,13 +150,13 @@ def main():
         st.Page(jtbds.jtbds_page, title="Jobs to be Done", icon="🎯"),
     ]
     
-    # Create navigation
+    # Create navigation with horizontal tabs at top
     try:
-        pg = st.navigation(pages)
+        pg = st.navigation(pages, position="top")
         
-        # Application header
-        st.title("🎯 JTBD Assistant Platform")
-        render_app_header()
+        # Clean application header (remove duplicate title)
+        st.markdown("### Transform customer research into actionable insights and solutions")
+        st.markdown("---")
         
         # Run the selected page
         pg.run()

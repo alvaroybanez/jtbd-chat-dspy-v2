@@ -17,13 +17,11 @@ logger = logging.getLogger(__name__)
 def chat_page() -> None:
     """Render the chat page with full interface."""
     try:
-        # Page header with controls
+        # Page header with controls (remove duplicate tagline)
         col1, col2, col3 = st.columns([3, 1, 1])
         
         with col1:
-            st.markdown(
-                "**Transform customer research into actionable insights and solutions**"
-            )
+            st.markdown("**Chat Assistant**")
         
         with col2:
             if st.button("📥 Export Chat", help="Export chat history"):
@@ -45,18 +43,18 @@ def chat_page() -> None:
         # Main chat interface
         render_chat_interface()
         
-        # Footer tips
+        # Footer tips - cleaner without excessive emojis
         st.markdown("---")
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.caption("💡 **Tip:** Search for insights and JTBDs to build context for HMW generation")
+            st.caption("**Tip:** Search for insights and JTBDs to build context for HMW generation")
         
         with col2:
-            st.caption("📊 **Budget:** Monitor token usage in the sidebar")
+            st.caption("**Budget:** Monitor token usage in the sidebar")
         
         with col3:
-            st.caption("🎯 **Goal:** Generate actionable How Might We questions")
+            st.caption("**Goal:** Generate actionable How Might We questions")
             
     except Exception as e:
         logger.error(f"Failed to render chat page: {e}")

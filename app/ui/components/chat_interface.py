@@ -48,122 +48,301 @@ class ChatInterface:
                 "selected_metrics": []
             }
     
+    def _render_workflow_stepper(self) -> None:
+        """Render workflow progress stepper."""
+        # Define workflow stages
+        stages = [
+            {"id": 1, "title": "Search & Select", "desc": "Find insights, JTBDs, and metrics"},
+            {"id": 2, "title": "Build Context", "desc": "Review and refine your selections"},
+            {"id": 3, "title": "Generate HMWs", "desc": "Create How Might We questions"},
+            {"id": 4, "title": "Explore & Chat", "desc": "Discuss and refine with AI"}
+        ]
+        
+        current_stage = st.session_state.workflow_stage
+        
+        # Create visual stepper
+        cols = st.columns(len(stages))
+        for i, stage in enumerate(stages):
+            with cols[i]:
+                # Stage indicator with better accessibility
+                if stage["id"] == current_stage:
+                    st.markdown(f"**:dart: {stage['id']}. {stage['title']}**")
+                    st.caption(f"*{stage['desc']}*")
+                elif stage["id"] < current_stage:
+                    st.markdown(f":white_check_mark: {stage['id']}. {stage['title']}")
+                    st.caption(stage['desc'])
+                else:
+                    st.markdown(f":hourglass_flowing_sand: {stage['id']}. {stage['title']}")
+                    st.caption(stage['desc'])
+        
+        st.markdown("---")
+    
+    def _render_stage_content(self) -> None:
+        """Render content based on current workflow stage."""
+        current_stage = st.session_state.workflow_stage
+        
+        if current_stage == 1:
+            self._render_search_stage()
+        elif current_stage == 2:
+            self._render_context_stage()
+        elif current_stage == 3:
+            self._render_hmw_stage()
+        elif current_stage == 4:
+            self._render_chat_stage()
+    
+    def _render_search_stage(self) -> None:
+        """Render search and selection stage."""
+        st.markdown("### :mag: Search & Select Content")
+        st.info("Start by searching for insights, JTBDs, and metrics to build your context.")
+        
+        # Search interface
+        self._render_input_area()
+        
+        # Progress to next stage button
+        if self._has_selected_items():
+            if st.button(":arrow_right: Continue to Build Context", type="primary"):
+                st.session_state.workflow_stage = 2
+                st.rerun()
+    
+    def _render_context_stage(self) -> None:
+        """Render context building and review stage."""
+        st.markdown("### :clipboard: Review Your Context")
+        st.info("Review your selected items and adjust if needed before generating HMWs.")
+        
+        # Show current selections in main area
+        if self.context_manager:
+            summary = self.context_manager.get_context_summary()
+            if summary.get("success"):
+                selection = summary["selection_summary"]
+                
+                # Display selections with accessible labels
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    insights_count = selection.get("insights", {}).get("count", 0)
+                    st.metric(":bulb: Insights", insights_count)
+                with col2:
+                    jtbds_count = selection.get("jtbds", {}).get("count", 0)
+                    st.metric(":dart: JTBDs", jtbds_count)
+                with col3:
+                    metrics_count = selection.get("metrics", {}).get("count", 0)
+                    st.metric(":bar_chart: Metrics", metrics_count)
+        
+        # Navigation buttons with accessible labels
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button(":arrow_left: Back to Search"):
+                st.session_state.workflow_stage = 1
+                st.rerun()
+        with col2:
+            if st.button(":arrow_right: Generate HMWs", type="primary"):
+                st.session_state.workflow_stage = 3
+                st.rerun()
+    
+    def _render_hmw_stage(self) -> None:
+        """Render HMW generation stage."""
+        st.markdown("### :dart: Generate How Might We Questions")
+        st.info("Generate actionable How Might We questions based on your selected context.")
+        
+        # HMW generation interface
+        if st.button(":rocket: Generate HMWs", type="primary"):
+            # Trigger HMW generation
+            st.success("HMW generation would happen here!")
+        
+        # Navigation buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button(":arrow_left: Back to Context"):
+                st.session_state.workflow_stage = 2
+                st.rerun()
+        with col2:
+            if st.button(":arrow_right: Start Chatting", type="primary"):
+                st.session_state.workflow_stage = 4
+                st.rerun()
+    
+    def _render_chat_stage(self) -> None:
+        """Render conversational chat stage."""
+        st.markdown("### :speech_balloon: Explore & Chat")
+        st.info("Chat with the AI to explore your insights and refine your understanding.")
+        
+        # Render chat area
+        self._render_chat_area()
+        
+        # Chat input
+        if query := st.chat_input("Ask questions about your insights, JTBDs, and metrics..."):
+            self._process_user_query(query, ["chunks", "insights", "jtbds"])
+        
+        # Back button
+        if st.button(":arrow_left: Back to HMW Generation"):
+            st.session_state.workflow_stage = 3
+            st.rerun()
+    
+    def _has_selected_items(self) -> bool:
+        """Check if user has selected any items."""
+        if not self.context_manager:
+            return False
+            
+        summary = self.context_manager.get_context_summary()
+        if not summary.get("success"):
+            return False
+            
+        selection = summary["selection_summary"]
+        total_selected = sum(
+            selection.get(key, {}).get("count", 0)
+            for key in ["insights", "jtbds", "metrics"]
+        )
+        return total_selected > 0
+    
+    def _render_search_sidebar(self) -> None:
+        """Render sidebar for search & select stage."""
+        # Search Settings (expanded by default for search stage)
+        with st.expander(":mag: Search Settings", expanded=True):
+            self._render_search_controls()
+        
+        # Token Budget (collapsed for search stage)
+        with st.expander(":bar_chart: Token Budget", expanded=False):
+            render_token_budget_indicator(self.context_manager)
+        
+        # Create Items (collapsed)
+        with st.expander(":heavy_plus_sign: Create Items", expanded=False):
+            self._render_create_forms()
+    
+    def _render_context_sidebar(self) -> None:
+        """Render sidebar for context building stage."""
+        # Token Budget (expanded for context review)
+        with st.expander(":bar_chart: Token Budget", expanded=True):
+            render_token_budget_indicator(self.context_manager)
+        
+        # Quick Actions
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Clear All", type="secondary", use_container_width=True):
+                self._clear_all_context()
+                st.rerun()
+        with col2:
+            if st.button("Add More", type="secondary", use_container_width=True):
+                st.session_state.workflow_stage = 1
+                st.rerun()
+    
+    def _render_hmw_sidebar(self) -> None:
+        """Render sidebar for HMW generation stage."""
+        # HMW Generation Controls
+        with st.expander(":dart: HMW Settings", expanded=True):
+            st.info("Configure HMW generation preferences here")
+        
+        # Token Budget
+        with st.expander(":bar_chart: Token Budget", expanded=False):
+            render_token_budget_indicator(self.context_manager)
+    
+    def _render_chat_sidebar(self) -> None:
+        """Render sidebar for chat stage."""
+        # Conversation Settings (expanded for chat stage)
+        with st.expander(":speech_balloon: Chat Settings", expanded=True):
+            conversation_enabled = st.toggle(
+                "Conversational AI",
+                value=True,
+                help="Enable AI-powered conversational responses"
+            )
+            
+            # Store conversation preference
+            st.session_state.conversation_enabled = conversation_enabled
+        
+        # Token Budget
+        with st.expander(":bar_chart: Token Budget", expanded=False):
+            render_token_budget_indicator(self.context_manager)
+        
+        # Quick Actions
+        if st.button("Clear Chat History", type="secondary", use_container_width=True):
+            st.session_state.chat_messages = []
+            st.rerun()
+    
+    def _render_search_controls(self) -> None:
+        """Render search configuration controls."""
+        # Similarity threshold
+        similarity_threshold = st.slider(
+            "Similarity Threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.7,
+            step=0.05,
+            help="Higher values return more similar results"
+        )
+        
+        # Results per type
+        results_limit = st.selectbox(
+            "Results per Type",
+            options=[5, 10, 15, 20],
+            index=1,
+            help="Number of results to show per content type"
+        )
+        
+        # Store settings in session state
+        st.session_state.similarity_threshold = similarity_threshold
+        st.session_state.results_limit = results_limit
+    
+    def _render_create_forms(self) -> None:
+        """Render compact creation forms."""
+        # JTBD Creation
+        if st.button("Create JTBD", use_container_width=True):
+            st.session_state.show_jtbd_form = True
+        
+        # Metric Creation
+        if st.button("Create Metric", use_container_width=True):
+            st.session_state.show_metric_form = True
+    
+    def _clear_all_context(self) -> None:
+        """Clear all context selections."""
+        if self.context_manager:
+            result = self.context_manager.clear_all_context()
+            if result.get("success"):
+                st.success("All context cleared successfully")
+            else:
+                st.error(f"Failed to clear context: {result.get('error')}")
+    
     def render(self) -> None:
         """Render the complete chat interface."""
         try:
-            # Main chat container
-            st.title("🎯 JTBD Assistant")
-            st.caption("Search and select insights, JTBDs, and metrics to build context for HMW generation")
+            # Initialize workflow stage if not exists
+            if 'workflow_stage' not in st.session_state:
+                st.session_state.workflow_stage = 1  # Start at stage 1 (Search & Select)
+            
+            # Workflow stepper
+            self._render_workflow_stepper()
             
             # Create layout with sidebar and main content
             with st.sidebar:
                 self._render_sidebar()
             
-            # Main chat area
-            self._render_chat_area()
+            # Main content based on workflow stage
+            self._render_stage_content()
             
-            # Input area
-            self._render_input_area()
+        except Exception as e:
+            logger.error(f"Failed to render chat interface: {e}")
+            st.error(f"Failed to load chat interface: {str(e)}")
             
         except Exception as e:
             logger.error(f"Failed to render chat interface: {e}")
             st.error(f"Failed to load chat interface: {str(e)}")
     
     def _render_sidebar(self) -> None:
-        """Render sidebar with context summary and controls."""
-        st.header("Context Summary")
+        """Render contextual sidebar with progressive disclosure based on workflow stage."""
+        current_stage = st.session_state.workflow_stage
         
+        # Always show context summary (essential for all stages)
         if self.context_manager:
-            # Render context summary using helper component
             render_context_summary_sidebar(self.context_manager)
             
-            # Token budget indicator
-            render_token_budget_indicator(self.context_manager)
-            
-            # Clear context button
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Clear All", type="secondary", use_container_width=True):
-                    self._clear_all_context()
-            
-            with col2:
-                if st.button("Prepare HMW", type="primary", use_container_width=True):
-                    self._prepare_hmw_generation()
+            # Contextual controls based on workflow stage
+            if current_stage == 1:  # Search & Select
+                self._render_search_sidebar()
+            elif current_stage == 2:  # Build Context
+                self._render_context_sidebar()
+            elif current_stage == 3:  # Generate HMWs
+                self._render_hmw_sidebar()
+            elif current_stage == 4:  # Explore & Chat
+                self._render_chat_sidebar()
+        
         else:
             st.error("Context manager not available")
-        
-        # Conversation settings
-        st.header("Conversation Settings")
-        conversation_enabled = st.toggle(
-            "💬 Conversational AI",
-            value=True,
-            help="Enable AI-powered conversational responses alongside search results"
-        )
-        
-        # Search settings
-        st.header("Search Settings")
-        similarity_threshold = st.slider(
-            "Similarity Threshold",
-            min_value=0.0,
-            max_value=1.0,
-            value=DEFAULT_SIMILARITY_THRESHOLD,
-            step=0.05,
-            help="Minimum similarity score for search results"
-        )
-        
-        results_per_type = st.selectbox(
-            "Results per Type",
-            options=[5, 10, 15, 20],
-            index=1,  # Default to 10
-            help="Maximum results to show for each content type"
-        )
-        
-        # Store settings in session state
-        st.session_state.search_settings = {
-            "similarity_threshold": similarity_threshold,
-            "results_per_type": results_per_type
-        }
-        st.session_state.conversation_settings = {
-            "enabled": conversation_enabled
-        }
-        
-        # Manual creation forms
-        st.header("Create Items")
-        st.caption("Manually create JTBDs and metrics")
-        
-        # JTBD creation form
-        if self.jtbd_service:
-            jtbd_result = render_compact_jtbd_form(
-                jtbd_service=self.jtbd_service,
-                key_prefix="sidebar_jtbd"
-            )
-            if jtbd_result and jtbd_result.get("success"):
-                # Add system message about successful creation
-                system_message = {
-                    "type": "system",
-                    "content": f"✅ JTBD created: {jtbd_result.get('jtbd', {}).get('statement', 'New JTBD')[:50]}...",
-                    "timestamp": datetime.now().isoformat()
-                }
-                st.session_state.chat_messages.append(system_message)
-        else:
-            st.warning("JTBD service not available")
-        
-        # Metric creation form
-        if self.metric_service:
-            metric_result = render_compact_metric_form(
-                metric_service=self.metric_service,
-                key_prefix="sidebar_metric"
-            )
-            if metric_result and metric_result.get("success"):
-                # Add system message about successful creation
-                system_message = {
-                    "type": "system",
-                    "content": f"📊 Metric created: {metric_result.get('metric', {}).get('name', 'New Metric')}",
-                    "timestamp": datetime.now().isoformat()
-                }
-                st.session_state.chat_messages.append(system_message)
-        else:
-            st.warning("Metric service not available")
     
     def _render_chat_area(self) -> None:
         """Render the main chat message area."""
